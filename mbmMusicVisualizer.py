@@ -18,7 +18,15 @@ class MusicVisualizer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "audio": "AUDIO" # TODO: add other params
+                "audio": "AUDIO",
+                "width": ("INT", {"default": 512}),
+                "height": ("INT", {"default": 512}),
+                "pitch": ("INT", {"default": 220}), # sensitivity
+                "tempo": ("INT", {"default": 220}), # sensitivity
+                "depth": ("FLOAT", {"default": 1.0}),
+                "jitter": ("FLOAT", {"default": 0.5}),
+                "truncation": ("FLOAT", {"default": 1.0}),
+                "smoothing": ("INT", {"default": 20}), # factor
             }
         }
 
@@ -27,5 +35,15 @@ class MusicVisualizer:
     FUNCTION = "process"
     CATEGORY = "MBMnodes"
 
-    def process(self, audio):
+    def process(self,
+        audio,
+        width: int,
+        height: int,
+        pitch: int,
+        tempo: int,
+        depth: float,
+        jitter: float,
+        truncation: float,
+        smoothing: int
+    ):
         return None
