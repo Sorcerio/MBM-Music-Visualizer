@@ -3,10 +3,12 @@
 
 # Imports
 import os
-import mbmMVShared as mvs
+import librosa
+
+from .mbmMVShared import fullpath, audioInputDir
 
 # Classes
-class MusicVisualizer:
+class AudioLoader:
     """
     Load an audio file.
     """
@@ -15,17 +17,22 @@ class MusicVisualizer:
 
     @classmethod
     def INPUT_TYPES(s):
-        inputDir = mvs.audioInputDir()
+        inputDir = audioInputDir()
         localFiles = [f for f in os.listdir(inputDir) if os.path.isfile(os.path.join(inputDir, f))]
+
         return {
             "required": {
-                "file": (sorted(localFiles), {"image_upload": True}),
+                "file": (sorted(localFiles),) # TODO: add more params?
             }
         }
 
-    RETURN_TYPES = ("AUDIO", )
+    RETURN_TYPES = ("AUDIO", "STRING")
+    RETURN_NAMES = ("AUDIO", "FILENAME")
     FUNCTION = "process"
-    CATEGORY = "MBMnodes"
+    CATEGORY = "MBMnodes/MusicVisualizer"
 
-    def process(self):
-        return None
+    def process(self, filepath: str):
+        return (
+            librosa.load(fullpath(filepath)),
+            os.path.splitext(os.path.basename(filepath))[0]
+        )
