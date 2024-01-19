@@ -22,7 +22,7 @@ class AudioLoader:
 
         return {
             "required": {
-                "file": (sorted(localFiles),) # TODO: add more params?
+                "filepath": (sorted(localFiles),) # TODO: add more params?
             }
         }
 
@@ -32,6 +32,8 @@ class AudioLoader:
     CATEGORY = "MBMnodes/MusicVisualizer"
 
     def process(self, filepath: str):
+        filepath = os.path.join(audioInputDir(), filepath)
+
         return (
             librosa.load(fullpath(filepath)),
             os.path.splitext(os.path.basename(filepath))[0]
