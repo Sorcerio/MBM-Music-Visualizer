@@ -119,11 +119,12 @@ class MusicVisualizer:
         chromaSort = np.argsort(np.mean(chroma, axis=1))[::-1]
 
         ## Generation
-        # Prepare latent output list
-        outputLatents: list[torch.Tensor] = []
-
         # Calculate tensor length
         tensorLen = len(latent_image)
+
+        # Prepare latent output tensor
+        # outputLatents: list[torch.Tensor] = []
+        outputTensor: torch.Tensor = None
 
         # Report
         print(f"Generating {tensorLen} images for music visualization")
@@ -132,7 +133,7 @@ class MusicVisualizer:
         curLatent = latent_image['samples']
         curJitter: np.ndarray = self._addJitter(jitter, tensorLen)
         latentUpdateLast = np.zeros(tensorLen)
-        for i in tqdm(range(len(spectroGrad)), desc="Generating"):
+        for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
             ## Latent Noise modification
             # Calculate some jitters
             if ((i % 200) == 0):
@@ -153,8 +154,7 @@ class MusicVisualizer:
 
             ## Generation
             # Generate the image
-            outputLatents.append(
-                common_ksampler(
+            imgTensor: torch.Tensor = common_ksampler(
                     model,
                     seed,
                     steps,
@@ -165,10 +165,17 @@ class MusicVisualizer:
                     negative,
                     {"samples": curLatent}, # ComfyUI, why package it?
                     denoise=denoise
-                )[0]
-            )
+                )[0]['samples']
 
-        return (outputLatents, )
+            if outputTensor is None:
+                outputTensor = imgTensor
+            else:
+                outputTensor = torch.vstack((
+                    outputTensor,
+                    imgTensor
+                ))
+
+        return ({"samples": outputTensor}, ) # TODO: why is it saving as black cubes?
 
     def _addJitter(self, jitterMod: float, length: int) -> np.ndarray:
         """
