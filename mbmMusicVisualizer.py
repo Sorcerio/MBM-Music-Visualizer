@@ -42,7 +42,7 @@ class MusicVisualizer:
 
                 # TODO: Move these into a MusicVisualizerSettings node
                 "pitch": ("INT", {"default": 220}), # sensitivity
-                "tempo": ("INT", {"default": 220}), # sensitivity
+                "tempo": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0}), # sensitivity
                 "depth": ("FLOAT", {"default": 1.0}),
                 "jitter": ("FLOAT", {"default": 0.5}),
                 "truncation": ("FLOAT", {"default": 1.0}),
@@ -71,7 +71,7 @@ class MusicVisualizer:
         denoise: float,
 
         pitch: int,
-        tempo: int,
+        tempo: float,
         depth: float,
         jitter: float,
         truncation: float,
@@ -98,15 +98,14 @@ class MusicVisualizer:
             hop_length=hop_length
         )
 
-        # Calculate mean power for hops
+        # Calculate normalized mean power per hop
         spectroMean = np.mean(spectro, axis=0)
 
-        # Calculate power gradient for hops
-        spectroGrad = np.gradient(spectroMean)
-        spectroGrad = (spectroGrad / np.max(spectroGrad)).clip(min=0)
+        # Calculate normalized power gradient per hop
+        spectroGrad = self._normalizeArray(np.gradient(spectroMean))
 
-        # Normalize mean power
-        spectroMean = (spectroMean / np.min(spectroMean)) / np.ptp(spectroMean)
+        # Normalize the spectro mean
+        spectroMean = self._normalizeArray(spectroMean)
 
         # Calculate pitch chroma for hops
         chroma = librosa.feature.chroma_cqt(
@@ -119,42 +118,18 @@ class MusicVisualizer:
         chromaSort = np.argsort(np.mean(chroma, axis=1))[::-1]
 
         ## Generation
-        # Calculate tensor length
-        tensorLen = len(latent_image)
-
         # Prepare latent output tensor
-        # outputLatents: list[torch.Tensor] = []
         outputTensor: torch.Tensor = None
 
-        # Report
-        print(f"Generating {tensorLen} images for music visualization")
-
-        # Loop through the spectrogram gradient
-        curLatent = latent_image['samples']
-        curJitter: np.ndarray = self._addJitter(jitter, tensorLen)
-        latentUpdateLast = np.zeros(tensorLen)
         for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
-            ## Latent Noise modification
-            # Calculate some jitters
-            if ((i % 200) == 0):
-                curJitter = self._addJitter(jitter, tensorLen)
+            # Calculate the latent tensor
+            latent_tensor = self._createLatent(tempo, spectroMean[i], spectroGrad[i], chromaSort).unsqueeze(0) # TODO: latent size from provided
 
-            # Calculate the latent update
-            latentUpdate = np.array([tempo for k in range(tensorLen)]) * (spectroGrad[i] + spectroMean[i]) * curJitter # TODO: didn't do 'update_dir'
+            print("LATENT TENSOR:", latent_tensor, latent_tensor.shape)
+            print("LATENT MIN MAX:", torch.min(latent_tensor), torch.max(latent_tensor))
 
-            # Smooth the latent update relative to last
-            latentUpdate = (latentUpdate + latentUpdateLast * 3) / 2
-
-            # Record the latent
-            curLatent = curLatent + latentUpdate
-            latentUpdateLast = latentUpdate
-
-            ## Prompt modification
-            # TODO: add this
-
-            ## Generation
             # Generate the image
-            imgTensor: torch.Tensor = common_ksampler(
+            imgTensor = common_ksampler(
                     model,
                     seed,
                     steps,
@@ -163,7 +138,7 @@ class MusicVisualizer:
                     scheduler,
                     positive,
                     negative,
-                    {"samples": curLatent}, # ComfyUI, why package it?
+                    {"samples": latent_tensor}, # ComfyUI, why package it?
                     denoise=denoise
                 )[0]['samples']
 
@@ -172,26 +147,48 @@ class MusicVisualizer:
             else:
                 outputTensor = torch.vstack((
                     outputTensor,
+                    # latent_tensor,
                     imgTensor
                 ))
 
-        return ({"samples": outputTensor}, ) # TODO: why is it saving as black cubes?
+            if i == 20:
+                break
 
-    def _addJitter(self, jitterMod: float, length: int) -> np.ndarray:
-        """
-        Adds jitter to the given array's values.
+        # print(outputTensor)
+        # print(outputTensor.shape)
 
-        jitterMod: The amount of jitter modification to apply.
-        length: The desired length of the output array.
+        return ({"samples": outputTensor}, )
 
-        Returns the jittered array.
-        """
-        # Add jitter
-        jitterOut = np.zeros(length)
-        for i in range(length):
-            if random.uniform(0, 1) < 0.5:
-                jitterOut[i] = 1
-            else:
-                jitterOut[i] = 1 - jitterMod
+    def _normalizeArray(self, array: np.ndarray) -> np.ndarray:
+            minVal = np.min(array)
+            maxVal = np.max(array)
+            return (array - minVal) / (maxVal - minVal)
 
-        return jitterOut
+    def _createLatent(self, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float):
+        # Convert the inputs to numpy arrays and concatenate
+        features = np.concatenate([
+            np.array([tempo]),
+            np.array([spectroMean]),
+            np.array([spectroGrad]),
+            # chromaSort
+        ])
+
+        # Ensure the features array is long enough
+        if len(features) < 2*4*64*64:
+            features = np.pad(features, (0, 2*4*64*64 - len(features)), "wrap")
+
+        # Use the features to parameterize a multivariate normal distribution
+        mean = torch.tensor(features[:4*64*64], dtype=torch.float32)
+        stdDev = torch.tensor(features[4*64*64:2*4*64*64], dtype=torch.float32).abs() + 1e-7
+        distribution = torch.distributions.Normal(mean, stdDev)
+
+        # Sample from the distribution to create the latent tensor
+        latentTensor = distribution.sample()
+
+        # Reshape the latent tensor to the desired shape
+        latentTensor = latentTensor.reshape((4, 64, 64))
+
+        # Normalize the latent tensor to be between 0.0 and 1.0
+        latentTensor = (latentTensor - torch.min(latentTensor)) / (torch.max(latentTensor) - torch.min(latentTensor))
+
+        return latentTensor
