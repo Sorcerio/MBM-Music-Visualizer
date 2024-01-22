@@ -18,9 +18,22 @@ class MusicVisualizer:
 
     Returns a batch tuple of images.
     """
+    # Class Constants
+    SEED_MODE_FIXED = "fixed"
+    SEED_MODE_RANDOM = "random"
+    SEED_MODE_INCREASE = "increase"
+    SEED_MODE_DECREASE = "decrease"
+
+    RETURN_TYPES = ("LATENT", )
+    RETURN_NAMES = ("LATENTS", )
+    FUNCTION = "process"
+    CATEGORY = "MBMnodes/MusicVisualizer"
+
+    # Constructor
     def __init__(self):
         pass
 
+    # ComfyUI Functions
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -30,6 +43,7 @@ class MusicVisualizer:
                 "negative": ("CONDITIONING", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "latent_image": ("LATENT", ),
+                "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
 
                 # TODO: Move these into a KSamplerSettings node
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -51,17 +65,13 @@ class MusicVisualizer:
             }
         }
 
-    RETURN_TYPES = ("LATENT", )
-    RETURN_NAMES = ("LATENTS", )
-    FUNCTION = "process"
-    CATEGORY = "MBMnodes/MusicVisualizer"
-
     def process(self,
         audio: tuple,
         positive, # What's a Conditioning?
         negative,
         seed: int,
         latent_image: torch.Tensor,
+        seed_mode: str,
 
         model, # What's a Model?
         steps: int,
@@ -122,6 +132,9 @@ class MusicVisualizer:
         outputTensor: torch.Tensor = None
 
         for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
+            # TODO: Add option to iterate prompt
+
+            # TODO: make optional
             # Calculate the latent tensor
             latent_tensor = self._createLatent(tempo, spectroMean[i], spectroGrad[i], chromaSort).unsqueeze(0) # TODO: latent size from provided
 
@@ -151,7 +164,10 @@ class MusicVisualizer:
                     imgTensor
                 ))
 
-            if i == 20:
+            # Iterate seed as needed
+            seed = self._iterateSeedByMode(seed, seed_mode)
+
+            if i == 20: # TODO: remove (or add option for this?)
                 break
 
         # print(outputTensor)
@@ -159,12 +175,30 @@ class MusicVisualizer:
 
         return ({"samples": outputTensor}, )
 
+    # Private Functions
     def _normalizeArray(self, array: np.ndarray) -> np.ndarray:
+            """
+            Normalizes the given array.
+
+            array: A numpy array.
+
+            Returns a normalized numpy array.
+            """
             minVal = np.min(array)
             maxVal = np.max(array)
             return (array - minVal) / (maxVal - minVal)
 
-    def _createLatent(self, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float):
+    def _createLatent(self, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float) -> torch.Tensor:
+        """
+        Creates a latent tensor from the provided audio features.
+
+        tempo: The tempo of the audio.
+        spectroMean: The normalized mean power of the audio.
+        spectroGrad: The normalized power gradient of the audio.
+        chromaSort: The sorted pitch chroma of the audio.
+
+        Returns a latent tensor.
+        """
         # Convert the inputs to numpy arrays and concatenate
         features = np.concatenate([
             np.array([tempo]),
@@ -192,3 +226,23 @@ class MusicVisualizer:
         latentTensor = (latentTensor - torch.min(latentTensor)) / (torch.max(latentTensor) - torch.min(latentTensor))
 
         return latentTensor
+
+    def _iterateSeedByMode(self, seed: int, seedMode: str):
+        """
+        Creates a new seed based on the provided mode.
+
+        seed: The seed to iterate.
+        seedMode: The mode to iterate by.
+
+        Returns the iterated seed.
+        """
+        if seedMode == MusicVisualizer.SEED_MODE_FIXED:
+            return seed
+        elif seedMode == MusicVisualizer.SEED_MODE_RANDOM:
+            return random.randint(0, 0xffffffffffffffff)
+        elif seedMode == MusicVisualizer.SEED_MODE_INCREASE:
+            return seed + 1
+        elif seedMode == MusicVisualizer.SEED_MODE_DECREASE:
+            return seed - 1
+        else:
+            return seed
