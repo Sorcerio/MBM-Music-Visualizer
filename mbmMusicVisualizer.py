@@ -96,9 +96,13 @@ class MusicVisualizer:
         # Unpack the audio
         y, sr = audio
 
-        # Calculate parameters
+        # Calculate pitch
         pitch = (300 - pitch) * 512 / hop_length
-        tempo = tempo * hop_length / 512 # TODO: replace with librosa.feature.tempo
+
+        # Calculate tempo
+        onset = librosa.onset.onset_strength(y=y, sr=sr)
+        tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
+        tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
 
         if smoothing > 1:
             smoothing = int(smoothing * 512 / hop_length)
@@ -136,15 +140,16 @@ class MusicVisualizer:
         ## Generation
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
+        latentTensor = latent_image["samples"]
         for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
             # TODO: Add option to iterate prompt
 
             # Calculate the latent tensor
             latentTensor = self._iterateLatentByMode(
-                latent_image["samples"],
+                latentTensor,
                 latent_mode,
                 intensity,
-                tempo,
+                tempo[i],
                 spectroMean[i],
                 spectroGrad[i],
                 chromaSort
@@ -179,7 +184,7 @@ class MusicVisualizer:
             # Iterate seed as needed
             seed = self._iterateSeedByMode(seed, seed_mode)
 
-            if i == 32: # TODO: remove (or add option for this?)
+            if i == 64: # TODO: remove (or add option for this?)
                 break
 
         print(outputTensor)
@@ -208,7 +213,8 @@ class MusicVisualizer:
         tempo: float,
         spectroMean: float,
         spectroGrad: float,
-        chromaSort: float) -> torch.Tensor:
+        chromaSort: float
+    ) -> torch.Tensor:
         """
         Produces a latent tensor based on the provided mode.
 
@@ -262,7 +268,8 @@ class MusicVisualizer:
         tempo: float,
         spectroMean: float,
         spectroGrad: float,
-        chromaSort: float) -> torch.Tensor:
+        chromaSort: float
+    ) -> torch.Tensor:
         """
         Applys the provided features to the latent tensor.
 
