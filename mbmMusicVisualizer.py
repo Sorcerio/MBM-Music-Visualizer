@@ -19,10 +19,16 @@ class MusicVisualizer:
     Returns a batch tuple of images.
     """
     # Class Constants
-    SEED_MODE_FIXED = "fixed"
-    SEED_MODE_RANDOM = "random"
-    SEED_MODE_INCREASE = "increase"
-    SEED_MODE_DECREASE = "decrease"
+    SEED_MODE_FIXED = "fixed" # Seed stays the same
+    SEED_MODE_RANDOM = "random" # Seed is random every hop
+    SEED_MODE_INCREASE = "increase" # Seed increases by 1 every hop
+    SEED_MODE_DECREASE = "decrease" # Seed decreases by 1 every hop
+
+    LATENT_MODE_STATIC = "static" # Only the provided latent is used ignoring audio features
+    LATENT_MODE_INCREASE = "increase" # Each hop adds, based on the audio features, to the last latent
+    LATENT_MODE_DECREASE = "decrease" # Each hop subtracts, based on the audio features, from the last latent
+    LATENT_MODE_FLOW = "flow" # Each hop will add or subtract, based on the audio features, from the last latent
+    LATENT_MODE_EACHHOP = "each_hop" # Each hop creates a new latent based on the audio features
 
     RETURN_TYPES = ("LATENT", )
     RETURN_NAMES = ("LATENTS", )
@@ -43,7 +49,10 @@ class MusicVisualizer:
                 "negative": ("CONDITIONING", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "latent_image": ("LATENT", ),
+
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
+                "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_EACHHOP], ),
+                # TODO: Add latent jitter (amount to modify the latent each hop by)
 
                 # TODO: Move these into a KSamplerSettings node
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -72,6 +81,7 @@ class MusicVisualizer:
         seed: int,
         latent_image: torch.Tensor,
         seed_mode: str,
+        latent_mode: str,
 
         model, # What's a Model?
         steps: int,
@@ -130,13 +140,15 @@ class MusicVisualizer:
         ## Generation
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
-
+        latentSize = latent_image["samples"].shape
         for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
             # TODO: Add option to iterate prompt
 
-            # TODO: make optional
             # Calculate the latent tensor
-            latent_tensor = self._createLatent(tempo, spectroMean[i], spectroGrad[i], chromaSort).unsqueeze(0) # TODO: latent size from provided
+            # TODO: latent size from provided
+            # TODO: iterate on top of previous latent!
+            # TODO: make optional
+            latent_tensor = self._createLatentWithFeats(latentSize, tempo, spectroMean[i], spectroGrad[i], chromaSort).unsqueeze(0)
 
             print("LATENT TENSOR:", latent_tensor, latent_tensor.shape)
             print("LATENT MIN MAX:", torch.min(latent_tensor), torch.max(latent_tensor))
@@ -188,16 +200,17 @@ class MusicVisualizer:
             maxVal = np.max(array)
             return (array - minVal) / (maxVal - minVal)
 
-    def _createLatent(self, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float) -> torch.Tensor:
+    def _createLatentWithFeats(self, shape: tuple[int, int, int, int], tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float) -> torch.Tensor:
         """
         Creates a latent tensor from the provided audio features.
 
+        shape: The shape of the latent tensor.
         tempo: The tempo of the audio.
         spectroMean: The normalized mean power of the audio.
         spectroGrad: The normalized power gradient of the audio.
         chromaSort: The sorted pitch chroma of the audio.
 
-        Returns a latent tensor.
+        Returns a latent tensor (without the "batch" dimension; add this with `.unsqueeze(0)`).
         """
         # Convert the inputs to numpy arrays and concatenate
         features = np.concatenate([
@@ -207,23 +220,39 @@ class MusicVisualizer:
             # chromaSort
         ])
 
+        print(tempo, spectroMean, spectroGrad)
+
+        print("FEATURES 1:", features, features.shape)
+
+        # Calculate the array bounds
+        boundsMain = shape[1] * shape[2] * shape[3]
+        boundsDouble = shape[0] * boundsMain
+
         # Ensure the features array is long enough
-        if len(features) < 2*4*64*64:
-            features = np.pad(features, (0, 2*4*64*64 - len(features)), "wrap")
+        if len(features) < boundsDouble:
+            features = np.pad(features, (0, boundsDouble - len(features)), "wrap")
+
+        print("FEATURES 2:", features, features.shape)
 
         # Use the features to parameterize a multivariate normal distribution
-        mean = torch.tensor(features[:4*64*64], dtype=torch.float32)
-        stdDev = torch.tensor(features[4*64*64:2*4*64*64], dtype=torch.float32).abs() + 1e-7
+        mean = torch.tensor(features[:boundsMain], dtype=torch.float32)
+        stdDev = torch.tensor(features[boundsMain:boundsDouble], dtype=torch.float32).abs() + 1e-7
         distribution = torch.distributions.Normal(mean, stdDev)
 
         # Sample from the distribution to create the latent tensor
         latentTensor = distribution.sample()
 
+        print("FEATURES 3:", features, features.shape)
+
         # Reshape the latent tensor to the desired shape
-        latentTensor = latentTensor.reshape((4, 64, 64))
+        latentTensor = latentTensor.reshape((shape[1], shape[2], shape[3]))
 
         # Normalize the latent tensor to be between 0.0 and 1.0
         latentTensor = (latentTensor - torch.min(latentTensor)) / (torch.max(latentTensor) - torch.min(latentTensor))
+
+        print("FEATURES 4:", features, features.shape)
+
+        exit()
 
         return latentTensor
 
