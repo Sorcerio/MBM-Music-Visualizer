@@ -54,8 +54,6 @@ class MusicVisualizer:
                 "latent_image": ("LATENT", ),
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
-                "pitch": ("INT", {"default": 220}), # sensitivity
-                "tempo": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0}), # sensitivity
                 "intensity": ("FLOAT", {"default": 0.75}),
                 "hop_length": ("INT", {"default": 512}),
 
@@ -78,8 +76,6 @@ class MusicVisualizer:
         latent_image: torch.Tensor,
         seed_mode: str,
         latent_mode: str,
-        pitch: int,
-        tempo: float,
         intensity: float,
         hop_length: int,
 
@@ -97,9 +93,6 @@ class MusicVisualizer:
         # Calculate the duration of the audio
         duration = librosa.get_duration(y=y, sr=sr, hop_length=hop_length)
         # hopSeconds = hop_length / sr
-
-        # Calculate pitch
-        pitch = (300 - pitch) * 512 / hop_length
 
         # Calculate tempo
         onset = librosa.onset.onset_strength(y=y, sr=sr)

@@ -5,7 +5,7 @@
 import os
 import librosa
 
-from .mbmMVShared import fullpath, audioInputDir
+from .mbmMVShared import AUDIO_EXTENSIONS, fullpath, audioInputDir
 
 # Classes
 class AudioLoader:
@@ -18,7 +18,7 @@ class AudioLoader:
     @classmethod
     def INPUT_TYPES(s):
         inputDir = audioInputDir()
-        localFiles = [f for f in os.listdir(inputDir) if os.path.isfile(os.path.join(inputDir, f))]
+        localFiles = [f for f in os.listdir(inputDir) if (os.path.isfile(os.path.join(inputDir, f)) and (os.path.splitext(f)[1].lower() in AUDIO_EXTENSIONS))]
 
         return {
             "required": {
