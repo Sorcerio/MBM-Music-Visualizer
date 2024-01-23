@@ -57,7 +57,8 @@ class MusicVisualizer:
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
                 "intensity": ("FLOAT", {"default": 0.75}),
                 "hop_length": ("INT", {"default": 512}),
-                "fps_target": ("FLOAT", {"default": 24, "min": 0, "max": 10000}), # Provide 0 to use whatever audio sampling comes up with
+                "fps_target": ("FLOAT", {"default": 24, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
+                "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -81,6 +82,7 @@ class MusicVisualizer:
         intensity: float,
         hop_length: int,
         fps_target: float,
+        image_limit: int,
 
         model, # What's a Model?
         steps: int,
@@ -158,7 +160,7 @@ class MusicVisualizer:
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
         latentTensor = latent_image["samples"]
-        for i in tqdm(range(len(tempo)), desc="Music Visualization"):
+        for i in (pbar := tqdm(range(len(tempo)), desc="Music Visualization")):
             # TODO: Add option to iterate prompt
 
             # Calculate the latent tensor
@@ -173,7 +175,12 @@ class MusicVisualizer:
             )
 
             # print("LATENT TENSOR:", latentTensor, latentTensor.shape)
-            print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
+            # print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
+
+            # Set progress bar info
+            pbar.set_postfix({
+                "Latent Mean": f"{torch.mean(latentTensor):.2f}"
+            })
 
             # Generate the image
             imgTensor = common_ksampler(
@@ -201,13 +208,17 @@ class MusicVisualizer:
             # Iterate seed as needed
             seed = self._iterateSeedByMode(seed, seed_mode)
 
-            if i == 8: # TODO: remove (or add option for this?)
+            # Limit if one if supplied
+            if (image_limit > 0) and (i >= (image_limit - 1)):
                 break
 
-        print(outputTensor)
-        print(outputTensor.shape)
-        for t in outputTensor:
-            print(torch.min(t), torch.max(t), torch.mean(t))
+        # print(outputTensor)
+        # print(outputTensor.shape)
+        # for t in outputTensor:
+        #     print(torch.min(t), torch.max(t), torch.mean(t))
+
+        # TODO: Figure out if there's a way to cleanup the values so that ComfyUI doesn't store the latent between runs (it needs to be new!)
+        # Maybe clone/copy it right off the bat?
 
         return ({"samples": outputTensor}, fps)
 
