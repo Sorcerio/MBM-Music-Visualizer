@@ -18,7 +18,7 @@ class AudioLoader:
     @classmethod
     def INPUT_TYPES(s):
         inputDir = audioInputDir()
-        localFiles = [f for f in os.listdir(inputDir) if (os.path.isfile(os.path.join(inputDir, f)) and (os.path.splitext(f)[1].lower() in AUDIO_EXTENSIONS))]
+        localFiles = [f for f in os.listdir(inputDir) if (os.path.isfile(os.path.join(inputDir, f)) and (os.path.splitext(f)[1].strip(".").lower() in AUDIO_EXTENSIONS))]
 
         return {
             "required": {
