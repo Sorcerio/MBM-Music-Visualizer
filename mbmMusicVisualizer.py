@@ -52,12 +52,15 @@ class MusicVisualizer:
                 "negative": ("CONDITIONING", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}), # TODO: EVERYTHING must use the seed
                 "latent_image": ("LATENT", ),
-
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
-                # TODO: Add latent jitter (amount to modify the latent each hop by)
+                "pitch": ("INT", {"default": 220}), # sensitivity
+                "tempo": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0}), # sensitivity
+                "intensity": ("FLOAT", {"default": 0.75}),
+                "smoothing": ("INT", {"default": 20}), # factor
+                "hop_length": ("INT", {"default": 512}),
 
-                # TODO: Move these into a KSamplerSettings node
+                # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
                 "model": ("MODEL",),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
@@ -65,15 +68,6 @@ class MusicVisualizer:
                 "sampler_name": (comfy.samplers.KSampler.SAMPLERS, ),
                 "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
                 "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-
-                # TODO: Move these into a MusicVisualizerSettings node
-                "pitch": ("INT", {"default": 220}), # sensitivity
-                "tempo": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0}), # sensitivity
-                "depth": ("FLOAT", {"default": 1.0}),
-                "jitter": ("FLOAT", {"default": 0.5}),
-                "truncation": ("FLOAT", {"default": 1.0}),
-                "smoothing": ("INT", {"default": 20}), # factor
-                "hop_length": ("INT", {"default": 512}),
             }
         }
 
@@ -85,6 +79,11 @@ class MusicVisualizer:
         latent_image: torch.Tensor,
         seed_mode: str,
         latent_mode: str,
+        pitch: int,
+        tempo: float,
+        intensity: float,
+        smoothing: int,
+        hop_length: int,
 
         model, # What's a Model?
         steps: int,
@@ -92,14 +91,6 @@ class MusicVisualizer:
         sampler_name: str,
         scheduler: str,
         denoise: float,
-
-        pitch: int,
-        tempo: float,
-        depth: float,
-        jitter: float,
-        truncation: float,
-        smoothing: int,
-        hop_length: int
     ):
         ## Setup Calculations
         # Unpack the audio
@@ -107,7 +98,7 @@ class MusicVisualizer:
 
         # Calculate parameters
         pitch = (300 - pitch) * 512 / hop_length
-        tempo = tempo * hop_length / 512
+        tempo = tempo * hop_length / 512 # TODO: replace with librosa.feature.tempo
 
         if smoothing > 1:
             smoothing = int(smoothing * 512 / hop_length)
@@ -149,20 +140,18 @@ class MusicVisualizer:
             # TODO: Add option to iterate prompt
 
             # Calculate the latent tensor
-            # TODO: latent size from provided
-            # TODO: iterate on top of previous latent!
-            # TODO: make optional
             latentTensor = self._iterateLatentByMode(
                 latent_image["samples"],
                 latent_mode,
+                intensity,
                 tempo,
                 spectroMean[i],
                 spectroGrad[i],
                 chromaSort
             )
 
-            print("LATENT TENSOR:", latentTensor, latentTensor.shape)
-            print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor))
+            # print("LATENT TENSOR:", latentTensor, latentTensor.shape)
+            print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
 
             # Generate the image
             imgTensor = common_ksampler(
@@ -190,7 +179,7 @@ class MusicVisualizer:
             # Iterate seed as needed
             seed = self._iterateSeedByMode(seed, seed_mode)
 
-            if i == 16: # TODO: remove (or add option for this?)
+            if i == 32: # TODO: remove (or add option for this?)
                 break
 
         print(outputTensor)
@@ -202,22 +191,30 @@ class MusicVisualizer:
 
     # Private Functions
     def _normalizeArray(self, array: np.ndarray) -> np.ndarray:
-            """
-            Normalizes the given array.
+        """
+        Normalizes the given array.
 
-            array: A numpy array.
+        array: A numpy array.
 
-            Returns a normalized numpy array.
-            """
-            minVal = np.min(array)
-            return (array - minVal) / (np.max(array) - minVal)
+        Returns a normalized numpy array.
+        """
+        minVal = np.min(array)
+        return (array - minVal) / (np.max(array) - minVal)
 
-    def _iterateLatentByMode(self, latent: torch.Tensor, latentMode: str, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float) -> torch.Tensor:
+    def _iterateLatentByMode(self,
+        latent: torch.Tensor,
+        latentMode: str,
+        intensity: float,
+        tempo: float,
+        spectroMean: float,
+        spectroGrad: float,
+        chromaSort: float) -> torch.Tensor:
         """
         Produces a latent tensor based on the provided mode.
 
         latent: The latent tensor to modify.
         latentMode: The mode to iterate by.
+        intensity: The amount to modify the latent by each hop.
         tempo: The tempo of the audio.
         spectroMean: The normalized mean power of the audio.
         spectroGrad: The normalized power gradient of the audio.
@@ -236,10 +233,10 @@ class MusicVisualizer:
         # Decide what to do based on mode
         if latentMode == MusicVisualizer.LATENT_MODE_INCREASE:
             # Each hop adds, based on the audio features, to the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_ADD, tempo, spectroMean, spectroGrad, chromaSort)
+            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_ADD, intensity, tempo, spectroMean, spectroGrad, chromaSort)
         elif latentMode == MusicVisualizer.LATENT_MODE_DECREASE:
             # Each hop subtracts, based on the audio features, from the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_SUBTRACT, tempo, spectroMean, spectroGrad, chromaSort)
+            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_SUBTRACT, intensity, tempo, spectroMean, spectroGrad, chromaSort)
         elif latentMode == MusicVisualizer.LATENT_MODE_GAUSS:
             # Each hop creates a new latent with guassian noise
             return self._createLatent(latent.shape)
@@ -258,12 +255,20 @@ class MusicVisualizer:
         # TODO: More specific noise range input
         return torch.tensor(np.random.normal(3, 2.5, size=size))
 
-    def _applyFeatToLatent(self, latent: torch.Tensor, method: str, tempo: float, spectroMean: float, spectroGrad: float, chromaSort: float) -> torch.Tensor:
+    def _applyFeatToLatent(self,
+        latent: torch.Tensor,
+        method: str,
+        intensity: float,
+        tempo: float,
+        spectroMean: float,
+        spectroGrad: float,
+        chromaSort: float) -> torch.Tensor:
         """
         Applys the provided features to the latent tensor.
 
         latent: The latent tensor to modify.
         method: The method to use to apply the features.
+        intensity: The amount to modify the latent by each hop.
         tempo: The tempo of the audio.
         spectroMean: The normalized mean power of the audio.
         spectroGrad: The normalized power gradient of the audio.
@@ -274,10 +279,10 @@ class MusicVisualizer:
         # Apply features to every point in the latent
         if method == MusicVisualizer.FEAT_APPLY_METHOD_ADD:
             # Add the features to the latent
-            latent += (tempo * (spectroMean + spectroGrad)) # Is this a good equation? Who knows!
+            latent += (tempo * (spectroMean + spectroGrad)) + intensity # Is this a good equation? Who knows!
         else: # FEAT_APPLY_METHOD_SUBTRACT
             # Subtract the features from the latent
-            latent -= (tempo * (spectroMean + spectroGrad))
+            latent -= (tempo * (spectroMean + spectroGrad)) + intensity
 
         # TODO: wrap chromaSort over the whole thing
 
