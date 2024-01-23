@@ -55,7 +55,7 @@ class MusicVisualizer:
                 "latent_image": ("LATENT", ),
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
-                "intensity": ("FLOAT", {"default": 0.75}),
+                "intensity": ("FLOAT", {"default": 1.0}), # Muiltiplier for the audio features
                 "hop_length": ("INT", {"default": 512}),
                 "fps_target": ("FLOAT", {"default": 24, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
@@ -103,8 +103,9 @@ class MusicVisualizer:
 
         # Calculate tempo
         onset = librosa.onset.onset_strength(y=y, sr=sr)
-        tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
-        tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
+        # tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
+        # tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
+        tempo = self._normalizeArray(librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None))
 
         # Calculate the spectrogram
         spectro = librosa.feature.melspectrogram(
@@ -119,7 +120,7 @@ class MusicVisualizer:
         spectroMean = np.mean(spectro, axis=0)
 
         # Calculate normalized power gradient per hop
-        spectroGrad = self._normalizeArray(np.gradient(spectroMean))
+        spectroGrad = self._normalizeArray(np.gradient(spectroMean), minVal=-1.0, maxVal=1.0)
 
         # Normalize the spectro mean
         spectroMean = self._normalizeArray(spectroMean)
@@ -162,6 +163,7 @@ class MusicVisualizer:
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
         latentTensor = latent_image["samples"].clone()
+        # modifiers = []
         for i in (pbar := tqdm(range(len(tempo)), desc="Music Visualization")):
             # TODO: Add option to iterate prompt
 
@@ -176,6 +178,8 @@ class MusicVisualizer:
                 spectroGrad[i],
                 chromaSort
             )
+
+            # modifiers.append(self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort))
 
             # print("LATENT TENSOR:", latentTensor, latentTensor.shape)
             # print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
@@ -220,19 +224,31 @@ class MusicVisualizer:
         # for t in outputTensor:
         #     print(torch.min(t), torch.max(t), torch.mean(t))
 
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(10, 6))
+        # plt.plot(tempo, label="Tempo")
+        # # plt.plot(spectroMean, label="Spectro Mean")
+        # plt.plot(spectroGrad, label="Spectro Grad")
+        # # plt.plot(chromaSort, label="Chroma Sort")
+        # plt.plot(np.array(modifiers), label="Modifiers")
+        # plt.legend()
+        # plt.show()
+
         return ({"samples": outputTensor}, fps)
 
     # Private Functions
-    def _normalizeArray(self, array: np.ndarray) -> np.ndarray:
+    def _normalizeArray(self, array: np.ndarray, minVal: float = 0.0, maxVal: float = 1.0) -> np.ndarray:
         """
-        Normalizes the given array.
+        Normalizes the given array between minVal and maxVal.
 
         array: A numpy array.
+        minVal: The minimum value of the normalized array.
+        maxVal: The maximum value of the normalized array.
 
         Returns a normalized numpy array.
         """
-        minVal = np.min(array)
-        return (array - minVal) / (np.max(array) - minVal)
+        arrayMin = np.min(array)
+        return minVal + (array - arrayMin) * (maxVal - minVal) / (np.max(array) - arrayMin)
 
     def _iterateLatentByMode(self,
         latent: torch.Tensor,
@@ -290,6 +306,27 @@ class MusicVisualizer:
         """
         # TODO: More specific noise range input
         return torch.tensor(np.random.normal(3, 2.5, size=size))
+    
+    def _calcLatentModifier(self,
+        intensity: float,
+        tempo: float,
+        spectroMean: float,
+        spectroGrad: float,
+        chromaSort: float
+    ) -> float:
+        """
+        Calculates the latent modifier based on the provided audio features.
+
+        intensity: The amount to modify the latent by each hop.
+        tempo: The tempo of the audio.
+        spectroMean: The normalized mean power of the audio.
+        spectroGrad: The normalized power gradient of the audio.
+        chromaSort: The sorted pitch chroma of the audio.
+
+        Returns the modifier.
+        """
+        # return (tempo * (spectroMean + spectroGrad)) + intensity # Is this a good equation? Who knows!
+        return ((tempo + 1.0) * (spectroMean + 1.0)) * intensity # Normalize between -1.0 and 1.0 w/ spectro grad then multiply by tempo?
 
     def _applyFeatToLatent(self,
         latent: torch.Tensor,
@@ -316,7 +353,7 @@ class MusicVisualizer:
         Returns the modified latent tensor.
         """
         # Calculate the modifier
-        curMod = (tempo * (spectroMean + spectroGrad)) + intensity # Is this a good equation? Who knows!
+        curMod = self._calcLatentModifier(intensity, tempo, spectroMean, spectroGrad, chromaSort)
 
         # Apply features to every point in the latent
         if method == MusicVisualizer.FEAT_APPLY_METHOD_ADD:
