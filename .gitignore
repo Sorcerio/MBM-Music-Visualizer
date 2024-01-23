@@ -1,5 +1,6 @@
 __pycache__/
 .vscode/
 test/
-audio/beethoven.mp3
+audio/
+!audio/AudioFilesHere.txt
 idea.md

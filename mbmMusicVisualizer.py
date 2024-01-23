@@ -7,6 +7,7 @@ import torch
 import random
 import numpy as np
 from tqdm import tqdm
+from scipy.signal import resample
 
 import comfy.samplers
 from nodes import common_ksampler
@@ -45,9 +46,9 @@ class MusicVisualizer:
     # ComfyUI Functions
     @classmethod
     def INPUT_TYPES(s):
-        return { # TODO: Consider an FPS based input that takes the duration of the audio and desired FPS to calculate hop and frame lengths (settings input nodes? then you can support both?)
+        return {
             "required": {
-                "audio": ("AUDIO",),
+                "audio": ("AUDIO", ),
                 "positive": ("CONDITIONING", ),
                 "negative": ("CONDITIONING", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}), # TODO: EVERYTHING must use the seed
@@ -56,6 +57,7 @@ class MusicVisualizer:
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
                 "intensity": ("FLOAT", {"default": 0.75}),
                 "hop_length": ("INT", {"default": 512}),
+                "fps_target": ("FLOAT", {"default": 24, "min": 0, "max": 10000}), # Provide 0 to use whatever audio sampling comes up with
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -78,6 +80,7 @@ class MusicVisualizer:
         latent_mode: str,
         intensity: float,
         hop_length: int,
+        fps_target: float,
 
         model, # What's a Model?
         steps: int,
@@ -98,9 +101,6 @@ class MusicVisualizer:
         onset = librosa.onset.onset_strength(y=y, sr=sr)
         tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
         tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
-
-        # Calculate the output FPS
-        fps = len(tempo) / duration
 
         # Calculate the spectrogram
         spectro = librosa.feature.melspectrogram(
@@ -130,6 +130,28 @@ class MusicVisualizer:
         # Sort pitch chroma
         chromaSort = np.argsort(np.mean(chroma, axis=1))[::-1]
 
+        # Calculate the output FPS
+        if fps_target <= 0:
+            # Calculate framerate based on audio
+            fps = len(tempo) / duration
+        else:
+            # Specific framerate to target
+            fps = fps_target
+
+            # Calculate desired frame count
+            desiredFrames = round(fps * duration)
+
+            # print("FRAMES", desiredFrames, fps, duration)
+            # print("TEMPO PRE:", tempo.shape, len(tempo), np.min(tempo), np.max(tempo), np.mean(tempo))
+
+            # Resample audio features to match desired frame count
+            tempo = resample(tempo, desiredFrames)
+            spectroMean = resample(spectroMean, desiredFrames)
+            spectroGrad = resample(spectroGrad, desiredFrames)
+
+            # print("TEMPO POST:", tempo.shape, len(tempo), np.min(tempo), np.max(tempo), np.mean(tempo))
+
+        # print("TEMPO:", tempo.shape, len(tempo))
         # print("INPUT TENSOR:", latent_image["samples"], latent_image["samples"].shape)
 
         ## Generation
@@ -179,7 +201,7 @@ class MusicVisualizer:
             # Iterate seed as needed
             seed = self._iterateSeedByMode(seed, seed_mode)
 
-            if i == 64: # TODO: remove (or add option for this?)
+            if i == 8: # TODO: remove (or add option for this?)
                 break
 
         print(outputTensor)
