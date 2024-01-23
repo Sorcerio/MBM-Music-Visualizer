@@ -33,8 +33,8 @@ class MusicVisualizer:
     FEAT_APPLY_METHOD_ADD = "add"
     FEAT_APPLY_METHOD_SUBTRACT = "subtract"
 
-    RETURN_TYPES = ("LATENT", )
-    RETURN_NAMES = ("LATENTS", )
+    RETURN_TYPES = ("LATENT", "FLOAT")
+    RETURN_NAMES = ("LATENTS", "FPS")
     FUNCTION = "process"
     CATEGORY = "MBMnodes/MusicVisualizer"
 
@@ -45,7 +45,7 @@ class MusicVisualizer:
     # ComfyUI Functions
     @classmethod
     def INPUT_TYPES(s):
-        return {
+        return { # TODO: Consider an FPS based input that takes the duration of the audio and desired FPS to calculate hop and frame lengths (settings input nodes? then you can support both?)
             "required": {
                 "audio": ("AUDIO",),
                 "positive": ("CONDITIONING", ),
@@ -57,7 +57,6 @@ class MusicVisualizer:
                 "pitch": ("INT", {"default": 220}), # sensitivity
                 "tempo": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0}), # sensitivity
                 "intensity": ("FLOAT", {"default": 0.75}),
-                "smoothing": ("INT", {"default": 20}), # factor
                 "hop_length": ("INT", {"default": 512}),
 
                 # TODO: Move these into a KSamplerSettings node?
@@ -82,7 +81,6 @@ class MusicVisualizer:
         pitch: int,
         tempo: float,
         intensity: float,
-        smoothing: int,
         hop_length: int,
 
         model, # What's a Model?
@@ -96,6 +94,10 @@ class MusicVisualizer:
         # Unpack the audio
         y, sr = audio
 
+        # Calculate the duration of the audio
+        duration = librosa.get_duration(y=y, sr=sr, hop_length=hop_length)
+        # hopSeconds = hop_length / sr
+
         # Calculate pitch
         pitch = (300 - pitch) * 512 / hop_length
 
@@ -104,8 +106,8 @@ class MusicVisualizer:
         tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
         tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
 
-        if smoothing > 1:
-            smoothing = int(smoothing * 512 / hop_length)
+        # Calculate the output FPS
+        fps = len(tempo) / duration
 
         # Calculate the spectrogram
         spectro = librosa.feature.melspectrogram(
@@ -141,7 +143,7 @@ class MusicVisualizer:
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
         latentTensor = latent_image["samples"]
-        for i in tqdm(range(len(spectroGrad)), desc="Music Visualization"):
+        for i in tqdm(range(len(tempo)), desc="Music Visualization"):
             # TODO: Add option to iterate prompt
 
             # Calculate the latent tensor
@@ -192,7 +194,7 @@ class MusicVisualizer:
         for t in outputTensor:
             print(torch.min(t), torch.max(t), torch.mean(t))
 
-        return ({"samples": outputTensor}, )
+        return ({"samples": outputTensor}, fps)
 
     # Private Functions
     def _normalizeArray(self, array: np.ndarray) -> np.ndarray:
