@@ -33,7 +33,7 @@ class PromptSequenceBuilder:
 
     def process(self, positive_1, negative_1, positive_2 = None, negative_2 = None, prompts: torch.Tensor = None):
         """
-        Returns a Tensor of the shape `[num of prompt sets, 2, *input tensor shape]`.
+        Returns a Tensor of the shape `[num of prompt sets, 2, *input tensor shape]` where 2 indicates the positive and negative tensors.
         """
         # Create a new prompt sequence
         if (positive_2 is None) or (negative_2 is None):

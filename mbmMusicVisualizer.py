@@ -49,8 +49,7 @@ class MusicVisualizer:
         return {
             "required": {
                 "audio": ("AUDIO", ),
-                "positive": ("CONDITIONING", ),
-                "negative": ("CONDITIONING", ),
+                "prompts": ("PROMPT_SEQ", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}), # TODO: EVERYTHING must use the seed
                 "latent_image": ("LATENT", ),
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
@@ -74,8 +73,7 @@ class MusicVisualizer:
 
     def process(self,
         audio: tuple,
-        positive, # What's a Conditioning?
-        negative,
+        prompts: torch.Tensor, # [num of prompt sets, 2, *conditioning tensor shape]
         seed: int,
         latent_image: dict[str, torch.Tensor],
         seed_mode: str,
@@ -160,13 +158,21 @@ class MusicVisualizer:
         # print("INPUT TENSOR:", latent_image["samples"], latent_image["samples"].shape)
 
         ## Generation
+        # Prepare the prompts
+        if prompts.shape[0] == 1:
+            # Only one prompt set so use it
+            promptPos = self._packPromptForComfy(prompts[0][0])
+            promptNeg = self._packPromptForComfy(prompts[0][1])
+        else:
+            # Multiple prompt sets so use the current index
+            raise NotImplementedError("TODO: Add prompt iteration")
+            promptPos = prompts[i][0]
+            promptNeg = prompts[i][1]
+
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
         latentTensor = latent_image["samples"].clone()
-        # modifiers = []
         for i in (pbar := tqdm(range(len(tempo)), desc="Music Visualization")):
-            # TODO: Add option to iterate prompt
-
             # Calculate the latent tensor
             latentTensor = self._iterateLatentByMode(
                 latentTensor,
@@ -186,7 +192,7 @@ class MusicVisualizer:
 
             # Set progress bar info
             pbar.set_postfix({
-                "Latent Mean": f"{torch.mean(latentTensor):.2f}"
+                "latent_mean": f"{torch.mean(latentTensor):.2f}"
             })
 
             # Generate the image
@@ -197,8 +203,8 @@ class MusicVisualizer:
                     cfg,
                     sampler_name,
                     scheduler,
-                    positive,
-                    negative,
+                    promptPos,
+                    promptNeg,
                     {"samples": latentTensor}, # ComfyUI, why package it?
                     denoise=denoise
                 )[0]['samples']
@@ -400,3 +406,9 @@ class MusicVisualizer:
         else: # SEED_MODE_FIXED
             # Seed stays the same
             return seed
+
+    def _packPromptForComfy(self, prompt: torch.Tensor):
+        """"
+        Packages a prompt from the `PromptSequenceBuilder` node for use with ComfyUI's code.
+        """
+        return [[prompt.unsqueeze(0), {"pooled_output": None}]]
