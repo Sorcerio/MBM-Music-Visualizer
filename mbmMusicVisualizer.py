@@ -158,21 +158,22 @@ class MusicVisualizer:
         # print("INPUT TENSOR:", latent_image["samples"], latent_image["samples"].shape)
 
         ## Generation
-        # Prepare the prompts
-        if prompts.shape[0] == 1:
-            # Only one prompt set so use it
-            promptPos = self._packPromptForComfy(prompts[0][0])
-            promptNeg = self._packPromptForComfy(prompts[0][1])
-        else:
-            # Multiple prompt sets so use the current index
-            raise NotImplementedError("TODO: Add prompt iteration")
-            promptPos = prompts[i][0]
-            promptNeg = prompts[i][1]
+        # Set intial prompts
+        promptPos = self._packPromptForComfy(prompts[0][0])
+        promptNeg = self._packPromptForComfy(prompts[0][1])
+
+        if prompts.shape[0] > 1:
+            # Calculate linear interpolation between prompts
+            # TODO: support multiple prompts (ie: desiredFrames / # of prompts so each section is interpolated independently; don't dupe the prompts; [-1], etc)
+            # TODO: almost equal check to avoid interpolation if they're basically the same
+            # TODO: Instead of linear interpolation, jump farther based on audio feature intensity
+            promptSeqPos = self.tensorLinspace(prompts[0][0], prompts[1][0], desiredFrames)
+            promptSeqNeg = self.tensorLinspace(prompts[0][1], prompts[1][1], desiredFrames)
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
         latentTensor = latent_image["samples"].clone()
-        for i in (pbar := tqdm(range(len(tempo)), desc="Music Visualization")):
+        for i in (pbar := tqdm(range(desiredFrames), desc="Music Visualization")):
             # Calculate the latent tensor
             latentTensor = self._iterateLatentByMode(
                 latentTensor,
@@ -192,7 +193,7 @@ class MusicVisualizer:
 
             # Set progress bar info
             pbar.set_postfix({
-                "latent_mean": f"{torch.mean(latentTensor):.2f}"
+                "feat_mod": f"{self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort):.2f}"
             })
 
             # Generate the image
@@ -218,12 +219,17 @@ class MusicVisualizer:
                     imgTensor
                 ))
 
-            # Iterate seed as needed
-            seed = self._iterateSeedByMode(seed, seed_mode)
-
             # Limit if one if supplied
             if (image_limit > 0) and (i >= (image_limit - 1)):
                 break
+
+            # Iterate seed as needed
+            seed = self._iterateSeedByMode(seed, seed_mode)
+
+            # Iterate the prompts as needed
+            if (prompts.shape[0] != 1) and ((i + 1) < desiredFrames):
+                promptPos = self._packPromptForComfy(promptSeqPos[i + 1])
+                promptNeg = self._packPromptForComfy(promptSeqNeg[i + 1])
 
         # print(outputTensor)
         # print(outputTensor.shape)
@@ -412,3 +418,29 @@ class MusicVisualizer:
         Packages a prompt from the `PromptSequenceBuilder` node for use with ComfyUI's code.
         """
         return [[prompt.unsqueeze(0), {"pooled_output": None}]]
+
+    @torch.jit.script
+    def tensorLinspace(start: torch.Tensor, stop: torch.Tensor, num: int) -> torch.Tensor:
+        """
+        Replicates the multi-dimensional bahaviour of `numpy.linspace` in PyTorch.
+        Function code and comments the functional solution provided in [Issue #61292 of PyTorch](https://github.com/pytorch/pytorch/issues/61292#issue-937937159).
+
+        start: A Tensor of the same shape as `stop`.
+        stop: A Tensor of the same shape as `start`.
+        num: The number of steps to have.
+
+        Returns a Tensor of shape `[num, *start.shape]` whose values are evenly spaced from start to end; inclusive.
+        """
+        # create a tensor of 'num' steps from 0 to 1
+        steps = torch.arange(num, dtype=torch.float32, device=start.device) / (num - 1)
+
+        # reshape the 'steps' tensor to [-1, *([1]*start.ndim)] to allow for broadcastings
+        # - using 'steps.reshape([-1, *([1]*start.ndim)])' would be nice here but torchscript
+        #   "cannot statically infer the expected size of a list in this contex", hence the code below
+        for i in range(start.ndim):
+            steps = steps.unsqueeze(-1)
+
+        # the output starts at 'start' and increments until 'stop' in each dimension
+        out = start[None] + steps*(stop - start)[None]
+
+        return out
