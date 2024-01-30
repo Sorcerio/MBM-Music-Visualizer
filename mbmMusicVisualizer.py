@@ -5,6 +5,7 @@
 import librosa
 import torch
 import random
+import math
 import numpy as np
 from tqdm import tqdm
 from scipy.signal import resample
@@ -164,11 +165,22 @@ class MusicVisualizer:
 
         if prompts.shape[0] > 1:
             # Calculate linear interpolation between prompts
-            # TODO: support multiple prompts (ie: desiredFrames / # of prompts so each section is interpolated independently; don't dupe the prompts; [-1], etc)
             # TODO: almost equal check to avoid interpolation if they're basically the same
             # TODO: Instead of linear interpolation, jump farther based on audio feature intensity
-            promptSeqPos = self.tensorLinspace(prompts[0][0], prompts[1][0], desiredFrames)
-            promptSeqNeg = self.tensorLinspace(prompts[0][1], prompts[1][1], desiredFrames)
+            promptSeqPos = None
+            promptSeqNeg = None
+            relDesiredFrames = math.ceil(desiredFrames / (prompts.shape[0] - 1))
+            for i in range(prompts.shape[0] - 1):
+                if promptSeqPos is None:
+                    promptSeqPos = self.tensorLinspace(prompts[i][0], prompts[i + 1][0], relDesiredFrames)
+                    promptSeqNeg = self.tensorLinspace(prompts[i][1], prompts[i + 1][1], relDesiredFrames)
+                else:
+                    promptSeqPos = torch.vstack((promptSeqPos, self.tensorLinspace(prompts[i][0], prompts[i + 1][0], relDesiredFrames)[1:]))
+                    promptSeqNeg = torch.vstack((promptSeqNeg, self.tensorLinspace(prompts[i][1], prompts[i + 1][1], relDesiredFrames)[1:]))
+
+            # Trim off the fat
+            promptSeqPos = promptSeqPos[:desiredFrames]
+            promptSeqNeg = promptSeqNeg[:desiredFrames]
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
