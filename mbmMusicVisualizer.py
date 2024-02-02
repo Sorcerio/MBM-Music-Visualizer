@@ -59,7 +59,7 @@ class MusicVisualizer:
                 "hop_length": ("INT", {"default": 512}),
                 "fps_target": ("FLOAT", {"default": 24, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
-                "latent_mod_limit": ("FLOAT", {"default": 16, "min": -1, "max": 10000}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
+                "latent_mod_limit": ("FLOAT", {"default": 10, "min": -1, "max": 10000}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -158,6 +158,11 @@ class MusicVisualizer:
         # print("TEMPO:", tempo.shape, len(tempo))
         # print("INPUT TENSOR:", latent_image["samples"], latent_image["samples"].shape)
 
+        # Calculate the feature modifier for each frame
+        featModifiers = torch.Tensor([self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort) for i in range(desiredFrames)])
+
+        # print("FEAT MODIFIERS:", featModifiers.shape, torch.min(featModifiers), torch.max(featModifiers), torch.mean(featModifiers), f"Matches: {len(featModifiers) == len(tempo)}")
+
         ## Generation
         # Set intial prompts
         promptPos = self._packPromptForComfy(prompts[0][0])
@@ -191,11 +196,7 @@ class MusicVisualizer:
                 latentTensor,
                 latent_mode,
                 latent_mod_limit,
-                intensity,
-                tempo[i],
-                spectroMean[i],
-                spectroGrad[i],
-                chromaSort
+                featModifiers[i]
             )
 
             # modifiers.append(self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort))
@@ -205,7 +206,8 @@ class MusicVisualizer:
 
             # Set progress bar info
             pbar.set_postfix({
-                "feat_mod": f"{self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort):.2f}"
+                "feat": f"{featModifiers[i]:.2f}",
+                "latent": f"{torch.mean(latentTensor):.2f}"
             })
 
             # Generate the image
@@ -278,11 +280,7 @@ class MusicVisualizer:
         latent: torch.Tensor,
         latentMode: str,
         modLimit: float,
-        intensity: float,
-        tempo: float,
-        spectroMean: float,
-        spectroGrad: float,
-        chromaSort: float
+        modifier: float
     ) -> torch.Tensor:
         """
         Produces a latent tensor based on the provided mode.
@@ -290,11 +288,7 @@ class MusicVisualizer:
         latent: The latent tensor to modify.
         latentMode: The mode to iterate by.
         modLimit: The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit.
-        intensity: The amount to modify the latent by each hop.
-        tempo: The tempo of the audio.
-        spectroMean: The normalized mean power of the audio.
-        spectroGrad: The normalized power gradient of the audio.
-        chromaSort: The sorted pitch chroma of the audio.
+        modifier: The amount to modify the latent by each hop.
 
         Returns the iterated latent tensor.
         """
@@ -309,10 +303,10 @@ class MusicVisualizer:
         # Decide what to do based on mode
         if latentMode == MusicVisualizer.LATENT_MODE_INCREASE:
             # Each hop adds, based on the audio features, to the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_ADD, modLimit, intensity, tempo, spectroMean, spectroGrad, chromaSort)
+            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_ADD, modLimit, modifier)
         elif latentMode == MusicVisualizer.LATENT_MODE_DECREASE:
             # Each hop subtracts, based on the audio features, from the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_SUBTRACT, modLimit, intensity, tempo, spectroMean, spectroGrad, chromaSort)
+            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_SUBTRACT, modLimit, modifier)
         elif latentMode == MusicVisualizer.LATENT_MODE_GAUSS:
             # Each hop creates a new latent with guassian noise
             return self._createLatent(latent.shape)
@@ -330,7 +324,7 @@ class MusicVisualizer:
         """
         # TODO: More specific noise range input
         return torch.tensor(np.random.normal(3, 2.5, size=size))
-    
+
     def _calcLatentModifier(self,
         intensity: float,
         tempo: float,
@@ -356,11 +350,7 @@ class MusicVisualizer:
         latent: torch.Tensor,
         method: str,
         modLimit: float,
-        intensity: float,
-        tempo: float,
-        spectroMean: float,
-        spectroGrad: float,
-        chromaSort: float
+        modifier: float
     ) -> torch.Tensor:
         """
         Applys the provided features to the latent tensor.
@@ -368,36 +358,29 @@ class MusicVisualizer:
         latent: The latent tensor to modify.
         method: The method to use to apply the features.
         modLimit: The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit.
-        intensity: The amount to modify the latent by each hop.
-        tempo: The tempo of the audio.
-        spectroMean: The normalized mean power of the audio.
-        spectroGrad: The normalized power gradient of the audio.
-        chromaSort: The sorted pitch chroma of the audio.
+        modifier: The amount to modify the latent by each hop.
 
         Returns the modified latent tensor.
         """
-        # Calculate the modifier
-        curMod = self._calcLatentModifier(intensity, tempo, spectroMean, spectroGrad, chromaSort)
-
         # Apply features to every point in the latent
         if method == MusicVisualizer.FEAT_APPLY_METHOD_ADD:
             # Add the features to the latent
             # Check if mean will be exceeded
-            if (modLimit > 0) and (torch.mean(latent) + curMod) > modLimit:
+            if (modLimit > 0) and (torch.mean(latent) + modifier) > modLimit:
                 # Mean is exceeded so latent only
                 return latent
 
             # Add the features to the latent
-            latent += curMod
+            latent += modifier
         else: # FEAT_APPLY_METHOD_SUBTRACT
             # Subtract the features from the latent
             # Check if mean will be exceeded
-            if (modLimit > 0) and (torch.mean(latent) - curMod) < -modLimit:
+            if (modLimit > 0) and (torch.mean(latent) - modifier) < -modLimit:
                 # Mean is exceeded so latent only
                 return latent
 
             # Subtract the features from the latent
-            latent -= curMod
+            latent -= modifier
 
         # TODO: wrap chromaSort over the whole thing
 
