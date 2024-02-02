@@ -165,27 +165,58 @@ class MusicVisualizer:
 
         ## Generation
         # Set intial prompts
-        promptPos = self._packPromptForComfy(prompts[0][0])
-        promptNeg = self._packPromptForComfy(prompts[0][1])
-
         if prompts.shape[0] > 1:
             # Calculate linear interpolation between prompts
-            # TODO: almost equal check to avoid interpolation if they're basically the same
-            # TODO: Instead of linear interpolation, jump farther based on audio feature intensity
             promptSeqPos = None
             promptSeqNeg = None
             relDesiredFrames = math.ceil(desiredFrames / (prompts.shape[0] - 1))
             for i in range(prompts.shape[0] - 1):
                 if promptSeqPos is None:
-                    promptSeqPos = self.tensorLinspace(prompts[i][0], prompts[i + 1][0], relDesiredFrames)
-                    promptSeqNeg = self.tensorLinspace(prompts[i][1], prompts[i + 1][1], relDesiredFrames)
+                    promptSeqPos = self._weightedInterpolation(
+                        prompts[i][0],
+                        prompts[i + 1][0],
+                        featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                    )
+                    promptSeqNeg = self._weightedInterpolation(
+                        prompts[i][1],
+                        prompts[i + 1][1],
+                        featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                    )
                 else:
-                    promptSeqPos = torch.vstack((promptSeqPos, self.tensorLinspace(prompts[i][0], prompts[i + 1][0], relDesiredFrames)[1:]))
-                    promptSeqNeg = torch.vstack((promptSeqNeg, self.tensorLinspace(prompts[i][1], prompts[i + 1][1], relDesiredFrames)[1:]))
+                    promptSeqPos = torch.vstack((
+                        promptSeqPos,
+                        self._weightedInterpolation(
+                            prompts[i][0],
+                            prompts[i + 1][0],
+                            featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                        )[1:]
+                    ))
+                    promptSeqNeg = torch.vstack((
+                        promptSeqNeg,
+                        self._weightedInterpolation(
+                            prompts[i][1],
+                            prompts[i + 1][1],
+                            featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                        )[1:]
+                    ))
 
-            # Trim off the fat
+            # Trim off any extra frames produced from ceil to int
             promptSeqPos = promptSeqPos[:desiredFrames]
             promptSeqNeg = promptSeqNeg[:desiredFrames]
+
+            # Set the initials prompt
+            promptPos = self._packPromptForComfy(promptSeqPos[0])
+            promptNeg = self._packPromptForComfy(promptSeqNeg[0])
+
+            # print("PROMPT SEQ POS:", promptSeqPos.shape, promptSeqPos.min(), promptSeqPos.max(), promptSeqPos.mean(), len(promptSeqPos))
+            # print("PROMPT SEQ NEG:", promptSeqNeg.shape, promptSeqNeg.min(), promptSeqNeg.max(), promptSeqNeg.mean(), len(promptSeqNeg))
+        else:
+            # Set single prompt
+            promptPos = self._packPromptForComfy(prompts[0][0])
+            promptNeg = self._packPromptForComfy(prompts[0][1])
+
+        # print("PROMPT POS:", promptPos)
+        # print("PROMPT NEG:", promptNeg)
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
@@ -414,28 +445,29 @@ class MusicVisualizer:
         """
         return [[prompt.unsqueeze(0), {"pooled_output": None}]]
 
-    @torch.jit.script
-    def tensorLinspace(start: torch.Tensor, stop: torch.Tensor, num: int) -> torch.Tensor:
+    def _weightedInterpolation(self, start: torch.Tensor, stop: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
         """
-        Replicates the multi-dimensional bahaviour of `numpy.linspace` in PyTorch.
-        Function code and comments the functional solution provided in [Issue #61292 of PyTorch](https://github.com/pytorch/pytorch/issues/61292#issue-937937159).
+        Interpolates between `start` and `stop` based on the given `weights` for each step in the interpolation.
 
         start: A Tensor of the same shape as `stop`.
         stop: A Tensor of the same shape as `start`.
-        num: The number of steps to have.
+        weights: A Tensor of weights to to use in each jump of the interpolation. This defines the number of gaps, not the total number of output Tensor elements.
 
-        Returns a Tensor of shape `[num, *start.shape]` whose values are evenly spaced from start to end; inclusive.
+        Returns a Tensor of shape `[(length of weights + 1), *start.shape]` where each step is an interpolation between `start` and `stop`.
+        Includes the `start` or `stop` tensors in the output.
         """
-        # create a tensor of 'num' steps from 0 to 1
-        steps = torch.arange(num, dtype=torch.float32, device=start.device) / (num - 1)
+        # Make sure weights are floats
+        weights = weights.float()
 
-        # reshape the 'steps' tensor to [-1, *([1]*start.ndim)] to allow for broadcastings
-        # - using 'steps.reshape([-1, *([1]*start.ndim)])' would be nice here but torchscript
-        #   "cannot statically infer the expected size of a list in this contex", hence the code below
-        for i in range(start.ndim):
-            steps = steps.unsqueeze(-1)
+        # Normalize weights
+        weights = weights / weights.sum()
 
-        # the output starts at 'start' and increments until 'stop' in each dimension
-        out = start[None] + steps*(stop - start)[None]
+        # Calculate the cumulative sum of the weights
+        cumWeight = weights.cumsum(dim=0)
 
-        return out
+        # Reshape the cumulative sum to allow for broadcasting
+        for _ in range(start.ndim): # [-1, *([1]*start.ndim)]
+            cumWeight = cumWeight.unsqueeze(-1)
+
+        # Interpolate with weights and add start
+        return torch.vstack([start.unsqueeze(0), (start[None] + cumWeight * (stop - start)[None])])
