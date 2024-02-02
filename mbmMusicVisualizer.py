@@ -31,6 +31,7 @@ class MusicVisualizer:
     LATENT_MODE_DECREASE = "decrease"
     LATENT_MODE_FLOW = "flow"
     LATENT_MODE_GAUSS = "guassian"
+    LATENT_MODE_BOUNCE = "bounce"
 
     FEAT_APPLY_METHOD_ADD = "add"
     FEAT_APPLY_METHOD_SUBTRACT = "subtract"
@@ -42,7 +43,7 @@ class MusicVisualizer:
 
     # Constructor
     def __init__(self):
-        pass
+        self.__isBouncingUp = True # Used when `bounce` mode is used to track direction
 
     # ComfyUI Functions
     @classmethod
@@ -54,12 +55,12 @@ class MusicVisualizer:
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}), # TODO: EVERYTHING must use the seed
                 "latent_image": ("LATENT", ),
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
-                "latent_mode": ([MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
+                "latent_mode": ([MusicVisualizer.LATENT_MODE_BOUNCE, MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
                 "intensity": ("FLOAT", {"default": 1.0}), # Muiltiplier for the audio features
                 "hop_length": ("INT", {"default": 512}),
                 "fps_target": ("FLOAT", {"default": 24, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
-                "latent_mod_limit": ("FLOAT", {"default": 10, "min": -1, "max": 10000}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
+                "latent_mod_limit": ("FLOAT", {"default": 7, "min": -1, "max": 10000}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -92,6 +93,11 @@ class MusicVisualizer:
         scheduler: str,
         denoise: float,
     ):
+        ## Validation
+        # Make sure if bounce mode is used that the latent mod limit is set
+        if (latent_mode == MusicVisualizer.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
+            raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
+
         ## Setup Calculations
         # Unpack the audio
         y, sr = audio
@@ -330,6 +336,26 @@ class MusicVisualizer:
                 latentMode = MusicVisualizer.LATENT_MODE_INCREASE
             else:
                 latentMode = MusicVisualizer.LATENT_MODE_DECREASE
+
+        if latentMode == MusicVisualizer.LATENT_MODE_BOUNCE:
+            # Increases to to the `modLimit`, then decreases to `-modLimit`, and loops as many times as needed building on the last latent
+            if modLimit > 0:
+                # Do the bounce operation
+                # Calculate the next value
+                curLatentMean = torch.mean(latent)
+                nextValue = (curLatentMean + modifier) if self.__isBouncingUp else (curLatentMean - modifier)
+
+                # Check if within bounds
+                if -modLimit <= nextValue <= modLimit:
+                    # Within bounds
+                    latentMode = MusicVisualizer.LATENT_MODE_INCREASE if self.__isBouncingUp else MusicVisualizer.LATENT_MODE_DECREASE
+                else:
+                    # Outside of bounds
+                    latentMode = MusicVisualizer.LATENT_MODE_DECREASE if self.__isBouncingUp else MusicVisualizer.LATENT_MODE_INCREASE
+                    self.__isBouncingUp = not self.__isBouncingUp
+            else:
+                # No limit so just increase
+                latentMode = MusicVisualizer.LATENT_MODE_INCREASE
 
         # Decide what to do based on mode
         if latentMode == MusicVisualizer.LATENT_MODE_INCREASE:
