@@ -7,6 +7,8 @@ import torch
 import random
 import math
 import numpy as np
+import matplotlib.pyplot as plt
+from typing import Union
 from tqdm import tqdm
 from scipy.signal import resample
 
@@ -244,6 +246,7 @@ class MusicVisualizer:
             # Set progress bar info
             pbar.set_postfix({
                 "feat": f"{featModifiers[i]:.2f}",
+                "prompt": f"{torch.mean(promptPos[0][0]):.2f}",
                 "latent": f"{torch.mean(latentTensor):.2f}"
             })
 
@@ -300,18 +303,19 @@ class MusicVisualizer:
         return ({"samples": outputTensor}, fps)
 
     # Private Functions
-    def _normalizeArray(self, array: np.ndarray, minVal: float = 0.0, maxVal: float = 1.0) -> np.ndarray:
+    def _normalizeArray(self, array: Union[np.ndarray, torch.Tensor], minVal: float = 0.0, maxVal: float = 1.0) -> Union[np.ndarray, torch.Tensor]:
         """
         Normalizes the given array between minVal and maxVal.
 
-        array: A numpy array.
+        array: A Numpy array or a Tensor.
         minVal: The minimum value of the normalized array.
         maxVal: The maximum value of the normalized array.
 
-        Returns a normalized numpy array.
+        Returns a normalized Numpy array or Tensor matching the `array` type.
         """
-        arrayMin = np.min(array)
-        return minVal + (array - arrayMin) * (maxVal - minVal) / (np.max(array) - arrayMin)
+        arrayMin = torch.min(array) if isinstance(array, torch.Tensor) else np.min(array)
+        arrayMax = torch.max(array) if isinstance(array, torch.Tensor) else np.max(array)
+        return minVal + (array - arrayMin) * (maxVal - minVal) / (arrayMax - arrayMin)
 
     def _iterateLatentByMode(self,
         latent: torch.Tensor,
@@ -497,3 +501,14 @@ class MusicVisualizer:
 
         # Interpolate with weights and add start
         return torch.vstack([start.unsqueeze(0), (start[None] + cumWeight * (stop - start)[None])])
+
+    def _chartData(self, data, title: str):
+        plt.figure(figsize=(20, 4))
+        plt.plot(data)
+        plt.grid(True)
+        plt.scatter(range(len(data)), data, color='red')
+        plt.title(title)
+        plt.xlabel('Index')
+        plt.ylabel('Value')
+        # plt.show()
+        plt.savefig(f"chart_{title.strip().replace(' ', '')}.png")
