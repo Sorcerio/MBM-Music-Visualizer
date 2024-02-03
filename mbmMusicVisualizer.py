@@ -6,11 +6,13 @@ import librosa
 import torch
 import random
 import math
+import io
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Union
 from tqdm import tqdm
 from scipy.signal import resample
+from PIL import Image
 
 import comfy.samplers
 from nodes import common_ksampler
@@ -38,8 +40,8 @@ class MusicVisualizer:
     FEAT_APPLY_METHOD_ADD = "add"
     FEAT_APPLY_METHOD_SUBTRACT = "subtract"
 
-    RETURN_TYPES = ("LATENT", "FLOAT")
-    RETURN_NAMES = ("LATENTS", "FPS")
+    RETURN_TYPES = ("LATENT", "FLOAT", "IMAGE")
+    RETURN_NAMES = ("LATENTS", "FPS", "CHARTS")
     FUNCTION = "process"
     CATEGORY = "MBMnodes/MusicVisualizer"
 
@@ -290,17 +292,20 @@ class MusicVisualizer:
         # for t in outputTensor:
         #     print(torch.min(t), torch.max(t), torch.mean(t))
 
-        # import matplotlib.pyplot as plt
-        # plt.figure(figsize=(10, 6))
-        # plt.plot(tempo, label="Tempo")
-        # # plt.plot(spectroMean, label="Spectro Mean")
-        # plt.plot(spectroGrad, label="Spectro Grad")
-        # # plt.plot(chromaSort, label="Chroma Sort")
-        # plt.plot(np.array(modifiers), label="Modifiers")
-        # plt.legend()
-        # plt.show()
+        # Render charts
+        chartImages = torch.vstack([
+            self._chartGenerationFeats(tempo, spectroMean, featModifiers, promptSeqPos),
+            self._chartData(tempo, "Tempo"),
+            self._chartData(spectroMean, "Spectro Mean"),
+            self._chartData(spectroGrad, "Spectro Grad"),
+            self._chartData(chromaSort, "Chroma Sort"),
+            self._chartData(featModifiers, "Modifiers"),
+            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
+            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
+        ])
 
-        return ({"samples": outputTensor}, fps)
+        # Return outputs
+        return ({"samples": outputTensor}, fps, chartImages)
 
     # Private Functions
     def _normalizeArray(self, array: Union[np.ndarray, torch.Tensor], minVal: float = 0.0, maxVal: float = 1.0) -> Union[np.ndarray, torch.Tensor]:
@@ -502,13 +507,73 @@ class MusicVisualizer:
         # Interpolate with weights and add start
         return torch.vstack([start.unsqueeze(0), (start[None] + cumWeight * (stop - start)[None])])
 
-    def _chartData(self, data, title: str):
-        plt.figure(figsize=(20, 4))
-        plt.plot(data)
-        plt.grid(True)
-        plt.scatter(range(len(data)), data, color='red')
-        plt.title(title)
-        plt.xlabel('Index')
-        plt.ylabel('Value')
-        # plt.show()
-        plt.savefig(f"chart_{title.strip().replace(' ', '')}.png")
+    def _renderChart(self, fig: plt.Figure) -> torch.Tensor:
+        """
+        Renders the provided chart.
+
+        fig: The chart to render.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Render the chart
+        fig.canvas.draw()
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format="png")
+        buffer.seek(0)
+
+        # Convert to an image tensor
+        return torch.from_numpy(
+            np.array(
+                Image.open(buffer).convert("RGB")
+            ).astype(np.float32) / 255.0
+        )[None,]
+
+    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str) -> torch.Tensor:
+        """
+        Creates a chart of the provided data.
+
+        data: A numpy array or a Tensor to chart.
+        title: The title of the chart.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Build the chart
+        fig, ax = plt.subplots(figsize=(20, 4))
+        ax.plot(data)
+        ax.grid(True)
+        ax.scatter(range(len(data)), data, color='red')
+        ax.set_title(title)
+        ax.set_xlabel('Index')
+        ax.set_ylabel('Value')
+
+        # Render the chart
+        return self._renderChart(fig)
+
+    def _chartGenerationFeats(self, tempo, spectroMean, featModifiers, promptSeqPos) -> torch.Tensor:
+        """
+        Creates a chart representing the entire generation flow.
+
+        data: A numpy array or a Tensor to chart.
+        tempo: The tempo feature data.
+        spectroMean: The spectrogram mean feature data.
+        featModifiers: The calculated feature modifiers.
+        promptSeqPos: The positive prompt sequence.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Build the chart
+        fig, ax = plt.subplots(figsize=(20, 4))
+
+        ax.plot(self._normalizeArray(tempo), label="Tempo") 
+        ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
+        ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
+        ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
+    
+        ax.legend()
+        ax.grid(True)
+        ax.set_title("Combined")
+        ax.set_xlabel('Index')
+        ax.set_ylabel('Value')
+
+        # Render the chart
+        return self._renderChart(fig)
