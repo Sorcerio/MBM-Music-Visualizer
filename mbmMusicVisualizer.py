@@ -78,25 +78,25 @@ class MusicVisualizer:
         }
 
     def process(self,
-        audio: tuple,
-        prompts: torch.Tensor, # [num of prompt sets, 2, *conditioning tensor shape]
-        seed: int,
-        latent_image: dict[str, torch.Tensor],
-        seed_mode: str,
-        latent_mode: str,
-        intensity: float,
-        hop_length: int,
-        fps_target: float,
-        image_limit: int,
-        latent_mod_limit: float,
+            audio: tuple,
+            prompts: torch.Tensor, # [num of prompt sets, 2, *conditioning tensor shape]
+            seed: int,
+            latent_image: dict[str, torch.Tensor],
+            seed_mode: str,
+            latent_mode: str,
+            intensity: float,
+            hop_length: int,
+            fps_target: float,
+            image_limit: int,
+            latent_mod_limit: float,
 
-        model, # What's a Model?
-        steps: int,
-        cfg: float,
-        sampler_name: str,
-        scheduler: str,
-        denoise: float,
-    ):
+            model,
+            steps: int,
+            cfg: float,
+            sampler_name: str,
+            scheduler: str,
+            denoise: float,
+        ):
         ## Validation
         # Make sure if bounce mode is used that the latent mod limit is set
         if (latent_mode == MusicVisualizer.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
@@ -294,7 +294,21 @@ class MusicVisualizer:
 
         # Render charts
         chartImages = torch.vstack([
-            self._chartGenerationFeats(tempo, spectroMean, featModifiers, promptSeqPos),
+            self._chartGenerationFeats(
+                {
+                    "seed": f"{seed} ({seed_mode})",
+                    "latent mode": latent_mode,
+                    "latent mod limit": f"{latent_mod_limit:.2f}",
+                    "intensity": f"{intensity:.2f}",
+                    "hop length": hop_length,
+                    "fps target": f"{fps_target:.2f}",
+                    "frames": desiredFrames
+                },
+                tempo,
+                spectroMean,
+                featModifiers,
+                promptSeqPos
+            ),
             self._chartData(tempo, "Tempo"),
             self._chartData(spectroMean, "Spectro Mean"),
             self._chartData(spectroGrad, "Spectro Grad"),
@@ -308,7 +322,11 @@ class MusicVisualizer:
         return ({"samples": outputTensor}, fps, chartImages)
 
     # Private Functions
-    def _normalizeArray(self, array: Union[np.ndarray, torch.Tensor], minVal: float = 0.0, maxVal: float = 1.0) -> Union[np.ndarray, torch.Tensor]:
+    def _normalizeArray(self,
+            array: Union[np.ndarray, torch.Tensor],
+            minVal: float = 0.0,
+            maxVal: float = 1.0
+        ) -> Union[np.ndarray, torch.Tensor]:
         """
         Normalizes the given array between minVal and maxVal.
 
@@ -323,11 +341,11 @@ class MusicVisualizer:
         return minVal + (array - arrayMin) * (maxVal - minVal) / (arrayMax - arrayMin)
 
     def _iterateLatentByMode(self,
-        latent: torch.Tensor,
-        latentMode: str,
-        modLimit: float,
-        modifier: float
-    ) -> torch.Tensor:
+            latent: torch.Tensor,
+            latentMode: str,
+            modLimit: float,
+            modifier: float
+        ) -> torch.Tensor:
         """
         Produces a latent tensor based on the provided mode.
 
@@ -392,12 +410,12 @@ class MusicVisualizer:
         return torch.tensor(np.random.normal(3, 2.5, size=size))
 
     def _calcLatentModifier(self,
-        intensity: float,
-        tempo: float,
-        spectroMean: float,
-        spectroGrad: float,
-        chromaSort: float
-    ) -> float:
+            intensity: float,
+            tempo: float,
+            spectroMean: float,
+            spectroGrad: float,
+            chromaSort: float
+        ) -> float:
         """
         Calculates the latent modifier based on the provided audio features.
 
@@ -413,11 +431,11 @@ class MusicVisualizer:
         return ((tempo + 1.0) * (spectroMean + 1.0)) * intensity # Normalize between -1.0 and 1.0 w/ spectro grad then multiply by tempo?
 
     def _applyFeatToLatent(self,
-        latent: torch.Tensor,
-        method: str,
-        modLimit: float,
-        modifier: float
-    ) -> torch.Tensor:
+            latent: torch.Tensor,
+            method: str,
+            modLimit: float,
+            modifier: float
+        ) -> torch.Tensor:
         """
         Applys the provided features to the latent tensor.
 
@@ -549,11 +567,17 @@ class MusicVisualizer:
         # Render the chart
         return self._renderChart(fig)
 
-    def _chartGenerationFeats(self, tempo, spectroMean, featModifiers, promptSeqPos) -> torch.Tensor:
+    def _chartGenerationFeats(self,
+            renderParams: dict[str, str],
+            tempo,
+            spectroMean,
+            featModifiers,
+            promptSeqPos
+        ) -> torch.Tensor:
         """
         Creates a chart representing the entire generation flow.
 
-        data: A numpy array or a Tensor to chart.
+        renderParams: The parameters used to render the chart.
         tempo: The tempo feature data.
         spectroMean: The spectrogram mean feature data.
         featModifiers: The calculated feature modifiers.
@@ -574,6 +598,10 @@ class MusicVisualizer:
         ax.set_title("Combined")
         ax.set_xlabel('Index')
         ax.set_ylabel('Value')
+
+        # Add the render parameters
+        renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
+        ax.text(1.02, 0.5, renderParams, transform=ax.transAxes, va="center")
 
         # Render the chart
         return self._renderChart(fig)
