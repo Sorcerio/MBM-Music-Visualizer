@@ -43,7 +43,7 @@ class MusicVisualizer:
     RETURN_TYPES = ("LATENT", "FLOAT", "IMAGE")
     RETURN_NAMES = ("LATENTS", "FPS", "CHARTS")
     FUNCTION = "process"
-    CATEGORY = "MBMnodes/MusicVisualizer"
+    CATEGORY = "MBMnodes/Audio"
 
     # Constructor
     def __init__(self):

@@ -29,7 +29,7 @@ class AudioLoader:
     RETURN_TYPES = ("AUDIO", "STRING")
     RETURN_NAMES = ("AUDIO", "FILENAME")
     FUNCTION = "process"
-    CATEGORY = "MBMnodes/MusicVisualizer"
+    CATEGORY = "MBMnodes/Audio"
 
     def process(self, filepath: str):
         filepath = os.path.join(audioInputDir(), filepath)
