@@ -103,6 +103,10 @@ class MusicVisualizer:
             raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
 
         ## Setup Calculations
+        # Set the random library seeds
+        random.seed(seed)
+        np.random.seed(seed)
+
         # Unpack the audio
         y, sr = audio
 
