@@ -155,23 +155,13 @@ class MusicVisualizer:
             # Calculate desired frame count
             desiredFrames = round(fps * duration)
 
-            # print("FRAMES", desiredFrames, fps, duration)
-            # print("TEMPO PRE:", tempo.shape, len(tempo), np.min(tempo), np.max(tempo), np.mean(tempo))
-
             # Resample audio features to match desired frame count
             tempo = resample(tempo, desiredFrames)
             spectroMean = resample(spectroMean, desiredFrames)
             spectroGrad = resample(spectroGrad, desiredFrames)
 
-            # print("TEMPO POST:", tempo.shape, len(tempo), np.min(tempo), np.max(tempo), np.mean(tempo))
-
-        # print("TEMPO:", tempo.shape, len(tempo))
-        # print("INPUT TENSOR:", latent_image["samples"], latent_image["samples"].shape)
-
         # Calculate the feature modifier for each frame
         featModifiers = torch.Tensor([self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort) for i in range(desiredFrames)])
-
-        # print("FEAT MODIFIERS:", featModifiers.shape, torch.min(featModifiers), torch.max(featModifiers), torch.mean(featModifiers), f"Matches: {len(featModifiers) == len(tempo)}")
 
         ## Generation
         # Set intial prompts
@@ -217,16 +207,10 @@ class MusicVisualizer:
             # Set the initials prompt
             promptPos = self._packPromptForComfy(promptSeqPos[0])
             promptNeg = self._packPromptForComfy(promptSeqNeg[0])
-
-            # print("PROMPT SEQ POS:", promptSeqPos.shape, promptSeqPos.min(), promptSeqPos.max(), promptSeqPos.mean(), len(promptSeqPos))
-            # print("PROMPT SEQ NEG:", promptSeqNeg.shape, promptSeqNeg.min(), promptSeqNeg.max(), promptSeqNeg.mean(), len(promptSeqNeg))
         else:
             # Set single prompt
             promptPos = self._packPromptForComfy(prompts[0][0])
             promptNeg = self._packPromptForComfy(prompts[0][1])
-
-        # print("PROMPT POS:", promptPos)
-        # print("PROMPT NEG:", promptNeg)
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
@@ -240,11 +224,6 @@ class MusicVisualizer:
                 latent_mod_limit,
                 featModifiers[i]
             )
-
-            # modifiers.append(self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort))
-
-            # print("LATENT TENSOR:", latentTensor, latentTensor.shape)
-            # print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
 
             # Records the latent tensor's mean
             latentTensorMeans[i] = torch.mean(latentTensor).numpy()
@@ -290,11 +269,6 @@ class MusicVisualizer:
             if (prompts.shape[0] != 1) and ((i + 1) < desiredFrames):
                 promptPos = self._packPromptForComfy(promptSeqPos[i + 1])
                 promptNeg = self._packPromptForComfy(promptSeqNeg[i + 1])
-
-        # print(outputTensor)
-        # print(outputTensor.shape)
-        # for t in outputTensor:
-        #     print(torch.min(t), torch.max(t), torch.mean(t))
 
         # Render charts
         chartImages = torch.vstack([
