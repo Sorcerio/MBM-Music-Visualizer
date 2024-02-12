@@ -230,6 +230,7 @@ class MusicVisualizer:
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
+        latentTensorMeans = np.zeros(desiredFrames)
         latentTensor = latent_image["samples"].clone()
         for i in (pbar := tqdm(range(desiredFrames), desc="Music Visualization")):
             # Calculate the latent tensor
@@ -245,11 +246,14 @@ class MusicVisualizer:
             # print("LATENT TENSOR:", latentTensor, latentTensor.shape)
             # print("LATENT MIN MAX:", torch.min(latentTensor), torch.max(latentTensor), torch.mean(latentTensor))
 
+            # Records the latent tensor's mean
+            latentTensorMeans[i] = torch.mean(latentTensor).numpy()
+
             # Set progress bar info
             pbar.set_postfix({
                 "feat": f"{featModifiers[i]:.2f}",
                 "prompt": f"{torch.mean(promptPos[0][0]):.2f}",
-                "latent": f"{torch.mean(latentTensor):.2f}"
+                "latent": f"{latentTensorMeans[i]:.2f}"
             })
 
             # Generate the image
@@ -314,6 +318,7 @@ class MusicVisualizer:
             self._chartData(spectroGrad, "Spectro Grad"),
             self._chartData(chromaSort, "Chroma Sort"),
             self._chartData(featModifiers, "Modifiers"),
+            self._chartData(latentTensorMeans, "Latent Means"),
             self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
             self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
         ])
@@ -559,10 +564,10 @@ class MusicVisualizer:
         fig, ax = plt.subplots(figsize=(20, 4))
         ax.plot(data)
         ax.grid(True)
-        ax.scatter(range(len(data)), data, color='red')
+        ax.scatter(range(len(data)), data, color="red")
         ax.set_title(title)
-        ax.set_xlabel('Index')
-        ax.set_ylabel('Value')
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Value")
 
         # Render the chart
         return self._renderChart(fig)
@@ -596,8 +601,8 @@ class MusicVisualizer:
         ax.legend()
         ax.grid(True)
         ax.set_title("Combined")
-        ax.set_xlabel('Index')
-        ax.set_ylabel('Value')
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Value")
 
         # Add the render parameters
         renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
