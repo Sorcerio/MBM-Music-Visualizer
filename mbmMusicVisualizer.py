@@ -17,6 +17,8 @@ from PIL import Image
 import comfy.samplers
 from nodes import common_ksampler
 
+from .mbmPromptSequence import MbmPrompt
+
 # Classes
 class MusicVisualizer:
     """
@@ -79,7 +81,7 @@ class MusicVisualizer:
 
     def process(self,
             audio: tuple,
-            prompts: torch.Tensor, # [num of prompt sets, 2, *conditioning tensor shape]
+            prompts: list[MbmPrompt],
             seed: int,
             latent_image: dict[str, torch.Tensor],
             seed_mode: str,
@@ -169,38 +171,69 @@ class MusicVisualizer:
 
         ## Generation
         # Set intial prompts
-        if prompts.shape[0] > 1:
+        promptCount = len(prompts)
+        if promptCount > 1:
+            # TODO: Clean this up into functions to remove duplicate code if possible
             # Calculate linear interpolation between prompts
             promptSeqPos = None
             promptSeqNeg = None
-            relDesiredFrames = math.ceil(desiredFrames / (prompts.shape[0] - 1))
-            for i in range(prompts.shape[0] - 1):
+            promptSeqPosPool = None
+            promptSeqNegPool = None
+            relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
+            for i in range(promptCount - 1):
+                curModifiers = featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
                 if promptSeqPos is None:
                     promptSeqPos = self._weightedInterpolation(
-                        prompts[i][0],
-                        prompts[i + 1][0],
-                        featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                        prompts[i].positive,
+                        prompts[i + 1].positive,
+                        curModifiers
                     )
                     promptSeqNeg = self._weightedInterpolation(
-                        prompts[i][1],
-                        prompts[i + 1][1],
-                        featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                        prompts[i].negative,
+                        prompts[i + 1].negative,
+                        curModifiers
+                    )
+                    promptSeqPosPool = self._weightedInterpolation(
+                        prompts[i].positivePool,
+                        prompts[i + 1].positivePool,
+                        curModifiers
+                    )
+                    promptSeqNegPool = self._weightedInterpolation(
+                        prompts[i].negativePool,
+                        prompts[i + 1].negativePool,
+                        curModifiers
                     )
                 else:
                     promptSeqPos = torch.vstack((
                         promptSeqPos,
                         self._weightedInterpolation(
-                            prompts[i][0],
-                            prompts[i + 1][0],
-                            featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                            prompts[i].positive,
+                            prompts[i + 1].positive,
+                            curModifiers
                         )[1:]
                     ))
                     promptSeqNeg = torch.vstack((
                         promptSeqNeg,
                         self._weightedInterpolation(
-                            prompts[i][1],
-                            prompts[i + 1][1],
-                            featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
+                            prompts[i].negative,
+                            prompts[i + 1].negative,
+                            curModifiers
+                        )[1:]
+                    ))
+                    promptSeqPosPool = torch.vstack((
+                        promptSeqPosPool,
+                        self._weightedInterpolation(
+                            prompts[i].positivePool,
+                            prompts[i + 1].positivePool,
+                            curModifiers
+                        )[1:]
+                    ))
+                    promptSeqNegPool = torch.vstack((
+                        promptSeqNegPool,
+                        self._weightedInterpolation(
+                            prompts[i].negativePool,
+                            prompts[i + 1].negativePool,
+                            curModifiers
                         )[1:]
                     ))
 
@@ -209,12 +242,15 @@ class MusicVisualizer:
             promptSeqNeg = promptSeqNeg[:desiredFrames]
 
             # Set the initials prompt
-            promptPos = self._packPromptForComfy(promptSeqPos[0])
-            promptNeg = self._packPromptForComfy(promptSeqNeg[0])
-        else:
+            promptPos = MbmPrompt.buildComfyUiPrompt(promptSeqPos[0], promptSeqPosPool[0])
+            promptNeg = MbmPrompt.buildComfyUiPrompt(promptSeqNeg[0], promptSeqNegPool[0])
+        elif promptCount == 1:
             # Set single prompt
-            promptPos = self._packPromptForComfy(prompts[0][0])
-            promptNeg = self._packPromptForComfy(prompts[0][1])
+            promptPos = prompts[0].positivePrompt()
+            promptNeg = prompts[0].negativePrompt()
+        else:
+            # No prompts
+            raise ValueError("No prompts were provided to the Music Visualizer node. At least one prompt is required.")
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
@@ -270,9 +306,9 @@ class MusicVisualizer:
             seed = self._iterateSeedByMode(seed, seed_mode)
 
             # Iterate the prompts as needed
-            if (prompts.shape[0] != 1) and ((i + 1) < desiredFrames):
-                promptPos = self._packPromptForComfy(promptSeqPos[i + 1])
-                promptNeg = self._packPromptForComfy(promptSeqNeg[i + 1])
+            if (promptCount > 1) and ((i + 1) < desiredFrames):
+                promptPos = MbmPrompt.buildComfyUiPrompt(promptSeqPos[i + 1], promptSeqPosPool[i + 1])
+                promptNeg = MbmPrompt.buildComfyUiPrompt(promptSeqNeg[i + 1], promptSeqNegPool[i + 1])
 
         # Render charts
         chartImages = torch.vstack([
@@ -474,12 +510,6 @@ class MusicVisualizer:
         else: # SEED_MODE_FIXED
             # Seed stays the same
             return seed
-
-    def _packPromptForComfy(self, prompt: torch.Tensor):
-        """"
-        Packages a prompt from the `PromptSequenceBuilder` node for use with ComfyUI's code.
-        """
-        return [[prompt.unsqueeze(0), {"pooled_output": None}]]
 
     def _weightedInterpolation(self, start: torch.Tensor, stop: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
         """
