@@ -105,7 +105,7 @@ class MusicVisualizer:
         ## Setup Calculations
         # Set the random library seeds
         random.seed(seed)
-        np.random.seed(seed)
+        np.random.default_rng(seed)
 
         # Unpack the audio
         y, sr = audio
