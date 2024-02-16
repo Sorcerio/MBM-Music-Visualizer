@@ -1,5 +1,7 @@
 # MBM's Music Visualizer
 
+![Header Image](./assets/header_v1.png "MBM Music Visualizer's Header Image")
+
 >
 > Nothing fuzzy about it.
 >
