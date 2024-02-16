@@ -297,8 +297,8 @@ class MusicVisualizer:
             self._chartData(chromaSort, "Chroma Sort"),
             self._chartData(featModifiers, "Modifiers"),
             self._chartData(latentTensorMeans, "Latent Means"),
-            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
-            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
+            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt", dotValues=False),
+            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt", dotValues=False)
         ])
 
         # Return outputs
@@ -529,12 +529,13 @@ class MusicVisualizer:
             ).astype(np.float32) / 255.0
         )[None,]
 
-    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str) -> torch.Tensor:
+    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = True) -> torch.Tensor:
         """
         Creates a chart of the provided data.
 
         data: A numpy array or a Tensor to chart.
         title: The title of the chart.
+        dotValues: If data points should be added as dots on top of the line.
 
         Returns a ComfyUI compatible Tensor image of the chart.
         """
@@ -542,7 +543,10 @@ class MusicVisualizer:
         fig, ax = plt.subplots(figsize=(20, 4))
         ax.plot(data)
         ax.grid(True)
-        ax.scatter(range(len(data)), data, color="red")
+
+        if dotValues:
+            ax.scatter(range(len(data)), data, color="red")
+
         ax.set_title(title)
         ax.set_xlabel("Index")
         ax.set_ylabel("Value")
