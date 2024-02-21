@@ -124,8 +124,6 @@ class MusicVisualizer:
 
         # Calculate tempo
         onset = librosa.onset.onset_strength(y=y, sr=sr)
-        # tempo: np.ndarray = librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None)
-        # tempo /= float(hop_length) # Idk, it puts it to a more reasonable range for image tensors
         tempo = self._normalizeArray(librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None))
 
         # Calculate the spectrogram
@@ -140,9 +138,6 @@ class MusicVisualizer:
         # Calculate normalized mean power per hop
         spectroMean = np.mean(spectro, axis=0)
 
-        # Calculate normalized power gradient per hop
-        spectroGrad = self._normalizeArray(np.gradient(spectroMean), minVal=-1.0, maxVal=1.0)
-
         # Normalize the spectro mean
         spectroMean = self._normalizeArray(spectroMean)
 
@@ -153,8 +148,8 @@ class MusicVisualizer:
             hop_length=hop_length
         )
 
-        # Sort pitch chroma
-        chromaSort = np.argsort(np.mean(chroma, axis=1))[::-1]
+        # Get the mean of the chroma for each step
+        chromaMean = np.mean(chroma, axis=0)
 
         # Calculate the output FPS
         if fps_target <= 0:
@@ -170,10 +165,11 @@ class MusicVisualizer:
             # Resample audio features to match desired frame count
             tempo = resample(tempo, desiredFrames)
             spectroMean = resample(spectroMean, desiredFrames)
-            spectroGrad = resample(spectroGrad, desiredFrames)
 
         # Calculate the feature modifier for each frame
-        featModifiers = torch.Tensor([self._calcLatentModifier(intensity, tempo[i], spectroMean[i], spectroGrad[i], chromaSort) for i in range(desiredFrames)])
+        featModifiers = torch.Tensor([
+            self._calcLatentModifier(intensity, tempo[i], spectroMean[i], chromaMean[i]) for i in range(desiredFrames)
+        ])
 
         ## Generation
         # Set intial prompts
@@ -336,8 +332,7 @@ class MusicVisualizer:
             ),
             self._chartData(tempo, "Tempo"),
             self._chartData(spectroMean, "Spectro Mean"),
-            self._chartData(spectroGrad, "Spectro Grad"),
-            self._chartData(chromaSort, "Chroma Sort"),
+            self._chartData(chromaMean, "Chroma Mean"),
             self._chartData(featModifiers, "Modifiers"),
             self._chartData(latentTensorMeans, "Latent Means"),
             self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt", dotValues=False),
@@ -439,22 +434,19 @@ class MusicVisualizer:
             intensity: float,
             tempo: float,
             spectroMean: float,
-            spectroGrad: float,
-            chromaSort: float
+            chromaMean: float
         ) -> float:
         """
         Calculates the latent modifier based on the provided audio features.
 
-        intensity: The amount to modify the latent by each hop.
-        tempo: The tempo of the audio.
-        spectroMean: The normalized mean power of the audio.
-        spectroGrad: The normalized power gradient of the audio.
-        chromaSort: The sorted pitch chroma of the audio.
+        intensity: A modifier to increase (>1.0) or decrease (<1.0) the overall effect of the audio features.
+        tempo: The tempo for a single step of the audio.
+        spectroMean: The normalized mean power for a single step of the audio.
+        chromaMean: The mean value of the chroma for a single step of the audio.
 
-        Returns the modifier.
+        Returns the calculated modifier.
         """
-        # return (tempo * (spectroMean + spectroGrad)) + intensity # Is this a good equation? Who knows!
-        return ((tempo + 1.0) * (spectroMean + 1.0)) * intensity # Normalize between -1.0 and 1.0 w/ spectro grad then multiply by tempo?
+        return (((tempo + 1.0) * (spectroMean + 1.0)) * intensity)
 
     def _applyFeatToLatent(self,
             latent: torch.Tensor,
