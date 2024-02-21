@@ -1,6 +1,12 @@
 # MBM's Music Visualizer: The Visualizer
 # Visualize a provided audio file.
 
+# TODO: Feature: Add filebased input (json) for prompt sequence.
+# TODO: Feature: Add ability to specify specific timecodes for prompts.
+# TODO: Feature: Add ability to use a hash (?) of a latent (image?) to generate a dummy (random?) audio input.
+# TODO: Feature: Add camera effects similar to Scene Weaver.
+# TODO: Feature: Add ability to drag in audio files to the loader.
+
 # Imports
 import librosa
 import torch
@@ -173,7 +179,6 @@ class MusicVisualizer:
         # Set intial prompts
         promptCount = len(prompts)
         if promptCount > 1:
-            # TODO: Clean this up into functions to remove duplicate code if possible
             # Calculate linear interpolation between prompts
             promptSeqPos = None
             promptSeqNeg = None
@@ -182,7 +187,7 @@ class MusicVisualizer:
             relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
             for i in range(promptCount - 1):
                 curModifiers = featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
-                if promptSeqPos is None:
+                if promptSeqPos is None: # Keep it in Tensor space for efficiency.
                     promptSeqPos = self._weightedInterpolation(
                         prompts[i].positive,
                         prompts[i + 1].positive,
@@ -240,6 +245,8 @@ class MusicVisualizer:
             # Trim off any extra frames produced from ceil to int
             promptSeqPos = promptSeqPos[:desiredFrames]
             promptSeqNeg = promptSeqNeg[:desiredFrames]
+            promptSeqPosPool = promptSeqPosPool[:desiredFrames]
+            promptSeqNegPool = promptSeqNegPool[:desiredFrames]
 
             # Set the initials prompt
             promptPos = MbmPrompt.buildComfyUiPrompt(promptSeqPos[0], promptSeqPosPool[0])
