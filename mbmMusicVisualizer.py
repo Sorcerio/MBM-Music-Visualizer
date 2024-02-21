@@ -168,9 +168,9 @@ class MusicVisualizer:
         chromaMean = resample(chromaMean, desiredFrames)
 
         # Calculate the feature modifier for each frame
-        featModifiers = torch.Tensor([
-            self._calcLatentModifier(intensity, tempo[i], spectroMean[i], chromaMean[i]) for i in range(desiredFrames)
-        ])
+        featModifiers = torch.Tensor(
+            [self._calcFeatModifier(intensity, tempo[i], spectroMean[i], chromaMean[i]) for i in range(desiredFrames)]
+        )
 
         ## Generation
         # Set intial prompts
@@ -432,21 +432,21 @@ class MusicVisualizer:
         # TODO: More specific noise range input
         return torch.tensor(np.random.normal(3, 2.5, size=size))
 
-    def _calcLatentModifier(self,
+    def _calcFeatModifier(self,
             intensity: float,
             tempo: float,
             spectroMean: float,
             chromaMean: float
         ) -> float:
         """
-        Calculates the latent modifier based on the provided audio features.
+        Calculates the overall feature modifier based on the provided audio features.
 
         intensity: A modifier to increase (>1.0) or decrease (<1.0) the overall effect of the audio features.
         tempo: The tempo for a single step of the audio.
         spectroMean: The normalized mean power for a single step of the audio.
         chromaMean: The mean value of the chroma for a single step of the audio.
 
-        Returns the calculated modifier.
+        Returns the calculated overall feature modifier.
         """
         return (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * intensity)
 
