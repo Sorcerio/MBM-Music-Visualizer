@@ -159,12 +159,13 @@ class MusicVisualizer:
             # Specific framerate to target
             fps = fps_target
 
-            # Calculate desired frame count
-            desiredFrames = round(fps * duration)
+        # Calculate desired frame count
+        desiredFrames = round(fps * duration)
 
-            # Resample audio features to match desired frame count
-            tempo = resample(tempo, desiredFrames)
-            spectroMean = resample(spectroMean, desiredFrames)
+        # Resample audio features to match desired frame count
+        tempo = resample(tempo, desiredFrames)
+        spectroMean = resample(spectroMean, desiredFrames)
+        chromaMean = resample(chromaMean, desiredFrames)
 
         # Calculate the feature modifier for each frame
         featModifiers = torch.Tensor([
@@ -274,7 +275,7 @@ class MusicVisualizer:
             # Set progress bar info
             pbar.set_postfix({
                 "feat": f"{featModifiers[i]:.2f}",
-                "prompt": f"{torch.mean(promptPos[0][0]):.2f}",
+                "prompt": f"{torch.mean(promptPos[0][0]):.4f}",
                 "latent": f"{latentTensorMeans[i]:.2f}"
             })
 
@@ -327,6 +328,7 @@ class MusicVisualizer:
                 },
                 tempo,
                 spectroMean,
+                chromaMean,
                 featModifiers,
                 promptSeqPos
             ),
@@ -335,8 +337,8 @@ class MusicVisualizer:
             self._chartData(chromaMean, "Chroma Mean"),
             self._chartData(featModifiers, "Modifiers"),
             self._chartData(latentTensorMeans, "Latent Means"),
-            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt", dotValues=False),
-            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt", dotValues=False)
+            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
+            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
         ])
 
         # Return outputs
@@ -446,7 +448,7 @@ class MusicVisualizer:
 
         Returns the calculated modifier.
         """
-        return (((tempo + 1.0) * (spectroMean + 1.0)) * intensity)
+        return (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * intensity)
 
     def _applyFeatToLatent(self,
             latent: torch.Tensor,
@@ -483,8 +485,6 @@ class MusicVisualizer:
 
             # Subtract the features from the latent
             latent -= modifier
-
-        # TODO: wrap chromaSort over the whole thing
 
         return latent
 
@@ -558,7 +558,7 @@ class MusicVisualizer:
             ).astype(np.float32) / 255.0
         )[None,]
 
-    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = True) -> torch.Tensor:
+    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = False) -> torch.Tensor:
         """
         Creates a chart of the provided data.
 
@@ -587,6 +587,7 @@ class MusicVisualizer:
             renderParams: dict[str, str],
             tempo,
             spectroMean,
+            chromaMean,
             featModifiers,
             promptSeqPos
         ) -> torch.Tensor:
@@ -606,6 +607,7 @@ class MusicVisualizer:
 
         ax.plot(self._normalizeArray(tempo), label="Tempo") 
         ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
+        ax.plot(self._normalizeArray(chromaMean), label="Chroma Mean")
         ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
         ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
     
