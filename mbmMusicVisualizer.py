@@ -15,7 +15,7 @@ import math
 import io
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Union
+from typing import Union, Optional
 from tqdm import tqdm
 from scipy.signal import resample
 from PIL import Image
@@ -48,6 +48,9 @@ class MusicVisualizer:
     FEAT_APPLY_METHOD_ADD = "add"
     FEAT_APPLY_METHOD_SUBTRACT = "subtract"
 
+    DEF_FEAT_MOD_MAX = 10000.0
+    DEF_FEAT_MOD_MIN = -10000.0
+
     RETURN_TYPES = ("LATENT", "FLOAT", "IMAGE")
     RETURN_NAMES = ("LATENTS", "FPS", "CHARTS")
     FUNCTION = "process"
@@ -72,7 +75,10 @@ class MusicVisualizer:
                 "hop_length": ("INT", {"default": 512}),
                 "fps_target": ("FLOAT", {"default": 6, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
-                "latent_mod_limit": ("FLOAT", {"default": 7, "min": -1, "max": 10000}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
+                "latent_mod_limit": ("FLOAT", {"default": 5.0, "min": -1.0, "max": 10000.0}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
+                "feat_mod_max": ("FLOAT", {"default": s.DEF_FEAT_MOD_MAX, "min": -10000.0, "max": 10000.0}), # The maximum value the feature modifier can be. 10,000 should be unattainable through normal usage.
+                "feat_mod_min": ("FLOAT", {"default": s.DEF_FEAT_MOD_MIN, "min": -10000.0, "max": 10000.0}), # The minimum value the feature modifier can be. -10,000 should be unattainable through normal usage.
+                "feat_mod_normalize": ([False, True], ), # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -97,6 +103,9 @@ class MusicVisualizer:
             fps_target: float,
             image_limit: int,
             latent_mod_limit: float,
+            feat_mod_max: float,
+            feat_mod_min: float,
+            feat_mod_normalize: bool,
 
             model,
             steps: int,
@@ -109,6 +118,16 @@ class MusicVisualizer:
         # Make sure if bounce mode is used that the latent mod limit is set
         if (latent_mode == MusicVisualizer.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
             raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
+
+        # Make sure the feature modifier values are valid
+        if feat_mod_max < feat_mod_min:
+            raise ValueError("The maximum feature modifier value must be greater than the minimum feature modifier value.")
+
+        if feat_mod_max == self.DEF_FEAT_MOD_MAX:
+            feat_mod_max = None
+
+        if feat_mod_min == self.DEF_FEAT_MOD_MIN:
+            feat_mod_min = None
 
         ## Setup Calculations
         # Set the random library seeds
@@ -169,8 +188,20 @@ class MusicVisualizer:
 
         # Calculate the feature modifier for each frame
         featModifiers = torch.Tensor(
-            [self._calcFeatModifier(intensity, tempo[i], spectroMean[i], chromaMean[i]) for i in range(desiredFrames)]
+            [self._calcFeatModifier(
+                intensity,
+                tempo[i],
+                spectroMean[i],
+                chromaMean[i],
+                modMax=feat_mod_max,
+                modMin=feat_mod_min
+            ) for i in range(desiredFrames)]
         )
+
+        # Normalize the feature modifiers if requested
+        if feat_mod_normalize:
+            # NOTE: The feat_mod_max and feat_mod_min values will be inaccurate realtive to the now normalized featModifiers array and must be adjusted if used later.
+            featModifiers = self._normalizeArray(featModifiers, minVal=0.0, maxVal=featModifiers.max().item())
 
         ## Generation
         # Set intial prompts
@@ -291,7 +322,7 @@ class MusicVisualizer:
                     promptNeg,
                     {"samples": latentTensor}, # ComfyUI, why package it?
                     denoise=denoise
-                )[0]['samples']
+                )[0]["samples"]
 
             if outputTensor is None:
                 outputTensor = imgTensor
@@ -322,6 +353,9 @@ class MusicVisualizer:
                     "latent mode": latent_mode,
                     "latent mod limit": f"{latent_mod_limit:.2f}",
                     "intensity": f"{intensity:.2f}",
+                    "feat mod max": (f"{feat_mod_max:.2f}" if (feat_mod_max is not None) else "none"),
+                    "feat mod min": (f"{feat_mod_min:.2f}" if (feat_mod_min is not None) else "none"),
+                    "feat mod norm": ("yes" if feat_mod_normalize else "no"),
                     "hop length": hop_length,
                     "fps target": f"{fps_target:.2f}",
                     "frames": desiredFrames
@@ -335,7 +369,7 @@ class MusicVisualizer:
             self._chartData(tempo, "Tempo"),
             self._chartData(spectroMean, "Spectro Mean"),
             self._chartData(chromaMean, "Chroma Mean"),
-            self._chartData(featModifiers, "Modifiers"),
+            self._chartFeatMod(featModifiers, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min),
             self._chartData(latentTensorMeans, "Latent Means"),
             self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
             self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
@@ -436,7 +470,9 @@ class MusicVisualizer:
             intensity: float,
             tempo: float,
             spectroMean: float,
-            chromaMean: float
+            chromaMean: float,
+            modMax: Optional[float] = None,
+            modMin: Optional[float] = None
         ) -> float:
         """
         Calculates the overall feature modifier based on the provided audio features.
@@ -445,10 +481,19 @@ class MusicVisualizer:
         tempo: The tempo for a single step of the audio.
         spectroMean: The normalized mean power for a single step of the audio.
         chromaMean: The mean value of the chroma for a single step of the audio.
+        modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
+        modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
 
         Returns the calculated overall feature modifier.
         """
-        return (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * intensity)
+        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * intensity)
+
+        if (modMax is not None) and (modVal > modMax):
+            return modMax
+        elif (modMin is not None) and (modVal < modMin):
+            return modMin
+        else:
+            return modVal
 
     def _applyFeatToLatent(self,
             latent: torch.Tensor,
@@ -620,6 +665,65 @@ class MusicVisualizer:
         # Add the render parameters
         renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
         ax.text(1.02, 0.5, renderParams, transform=ax.transAxes, va="center")
+
+        # Render the chart
+        return self._renderChart(fig)
+
+    def _chartFeatMod(self,
+            featModifiers: torch.Tensor,
+            isNormalized: bool,
+            modMax: Optional[float] = None,
+            modMin: Optional[float] = None
+        ) -> torch.Tensor:
+        """
+        Creates a chart representing the feature modifier.
+
+        featModifiers: The calculated feature modifiers.
+        isNormalized: If the feature modifiers are normalized.
+        modMax: The maximum value the feature modifier can be. Provide `None` to display no maximum.
+        modMin: The minimum value the feature modifier can be. Provide `None` to display no minimum.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Build the chart
+        fig, ax = plt.subplots(figsize=(20, 4))
+
+        ax.plot(featModifiers, label="Modifiers")
+
+        modMaxStr = "none"
+        if modMax is not None:
+            if isNormalized:
+                # Use logical value
+                modMaxAlt = featModifiers.max().item()
+                modMaxStr = f"{modMaxAlt:.2f} ({modMax:.2f})"
+                plt.axhline(y=modMaxAlt, linestyle="dotted", color="yellow", label="Mod Max")
+            else:
+                # Use prescribed value
+                modMaxStr = f"{modMax:.2f}"
+                plt.axhline(y=modMax, linestyle="dotted", color="yellow", label="Mod Max")
+
+        modMinStr = "none"
+        if modMin is not None:
+            if isNormalized:
+                # Use logical value
+                modMinStr = f"0 ({modMin:.2f})"
+                plt.axhline(y=0, linestyle="dotted", color="green", label="Mod Min")
+            else:
+                # Use prescribed value
+                modMinStr = f"{modMin:.2f}"
+                plt.axhline(y=modMin, linestyle="dotted", color="green", label="Mod Min")
+
+        ax.legend()
+        ax.grid(True)
+        ax.set_title("Feature Modifiers")
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Value")
+
+        # Add feature information
+        featureInfo = f"Normalized: {('yes' if isNormalized else 'no')}\n"
+        featureInfo += f"Max: {modMaxStr}\n"
+        featureInfo += f"Min: {modMinStr}"
+        ax.text(1.02, 0.5, featureInfo, transform=ax.transAxes, va="center")
 
         # Render the chart
         return self._renderChart(fig)
