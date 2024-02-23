@@ -2,23 +2,13 @@
 # Interpolates additional prompts from a prompt sequence based on input.
 
 # Imports
-import librosa
 import torch
-import random
 import math
-import io
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Union, Optional
-from tqdm import tqdm
-from scipy.signal import resample
-from PIL import Image
-
-import comfy.samplers
-from nodes import common_ksampler
+from typing import Optional
 
 from .mbmPromptSequence import MbmPrompt
 from .mbmInterpPromptSequence import InterpPromptSequence
+from .mbmMVShared import chartData
 
 # Classes
 class PromptSequenceInterpolator:
@@ -82,8 +72,14 @@ class PromptSequenceInterpolator:
             # No prompts my guy
             raise ValueError("At least one prompt is required.")
 
+        # Render the charts
+        chartImages = torch.vstack([
+            chartData([torch.mean(pt.positive) for pt in promptSeq], "Positive Prompt"),
+            chartData([torch.mean(pt.negative) for pt in promptSeq], "Negative Prompt")
+        ])
+
         return (
             promptSeq,
-            # TODO: charts
+            chartImages
         )
 
