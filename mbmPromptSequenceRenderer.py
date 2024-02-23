@@ -27,7 +27,7 @@ from .mbmPrompt import MbmPrompt
 from .mbmMVShared import chartData
 
 # Classes
-class PromptSequenceRenderer: # TODO: rename
+class PromptSequenceRenderer:
     """
     Renders a prompt sequence into a set of images.
     """
