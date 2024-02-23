@@ -25,11 +25,11 @@ from PIL import Image
 import comfy.samplers
 from nodes import common_ksampler
 
-from .mbmPromptSequence import MbmPrompt
-from .mbmInterpPromptSequence import InterpPromptSequence
+from .mbmPrompt import MbmPrompt
+from .mbmMVShared import chartData
 
 # Classes
-class MusicVisualizer:
+class MusicVisualizer: # TODO: rename
     """
     Visualize a provided audio file.
 
@@ -51,11 +51,8 @@ class MusicVisualizer:
     FEAT_APPLY_METHOD_ADD = "add"
     FEAT_APPLY_METHOD_SUBTRACT = "subtract"
 
-    DEF_FEAT_MOD_MAX = 10000.0
-    DEF_FEAT_MOD_MIN = -10000.0
-
-    RETURN_TYPES = ("LATENT", "FLOAT", "IMAGE")
-    RETURN_NAMES = ("LATENTS", "FPS", "CHARTS")
+    RETURN_TYPES = ("LATENT", "IMAGE")
+    RETURN_NAMES = ("LATENTS", "CHARTS")
     FUNCTION = "process"
     CATEGORY = "MBMnodes/Audio"
 
@@ -68,20 +65,14 @@ class MusicVisualizer:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "audio": ("AUDIO", ),
                 "prompts": ("PROMPT_SEQ", ),
+                "latent_mods": ("TENSOR_1D", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "latent_image": ("LATENT", ),
                 "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
                 "latent_mode": ([MusicVisualizer.LATENT_MODE_BOUNCE, MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
-                "intensity": ("FLOAT", {"default": 1.0}), # Muiltiplier for the audio features
-                "hop_length": ("INT", {"default": 512}),
-                "fps_target": ("FLOAT", {"default": 6, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "latent_mod_limit": ("FLOAT", {"default": 5.0, "min": -1.0, "max": 10000.0}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
-                "feat_mod_max": ("FLOAT", {"default": s.DEF_FEAT_MOD_MAX, "min": -10000.0, "max": 10000.0}), # The maximum value the feature modifier can be. 10,000 should be unattainable through normal usage.
-                "feat_mod_min": ("FLOAT", {"default": s.DEF_FEAT_MOD_MIN, "min": -10000.0, "max": 10000.0}), # The minimum value the feature modifier can be. -10,000 should be unattainable through normal usage.
-                "feat_mod_normalize": ([False, True], ), # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
 
                 # TODO: Move these into a KSamplerSettings node?
                 # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
@@ -95,20 +86,14 @@ class MusicVisualizer:
         }
 
     def process(self,
-            audio: tuple,
             prompts: list[MbmPrompt],
+            latent_mods: torch.Tensor,
             seed: int,
             latent_image: dict[str, torch.Tensor],
             seed_mode: str,
             latent_mode: str,
-            intensity: float,
-            hop_length: int,
-            fps_target: float,
             image_limit: int,
             latent_mod_limit: float,
-            feat_mod_max: float,
-            feat_mod_min: float,
-            feat_mod_normalize: bool,
 
             model,
             steps: int,
@@ -117,138 +102,34 @@ class MusicVisualizer:
             scheduler: str,
             denoise: float,
         ):
+        ## Setup
+        # Set the random library seeds
+        random.seed(seed)
+        np.random.default_rng(seed)
+
+        # Get the counts
+        desiredFrames = len(prompts[0].positive)
+        promptCount = len(prompts)
+
         ## Validation
         # Make sure if bounce mode is used that the latent mod limit is set
         if (latent_mode == MusicVisualizer.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
             raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
 
-        # Make sure the feature modifier values are valid
-        if feat_mod_max < feat_mod_min:
-            raise ValueError("The maximum feature modifier value must be greater than the minimum feature modifier value.")
-
-        if feat_mod_max == self.DEF_FEAT_MOD_MAX:
-            feat_mod_max = None
-
-        if feat_mod_min == self.DEF_FEAT_MOD_MIN:
-            feat_mod_min = None
-
-        ## Setup Calculations
-        # Set the random library seeds
-        random.seed(seed)
-        np.random.default_rng(seed)
-
-        # Unpack the audio
-        y, sr = audio
-
-        # Calculate the duration of the audio
-        duration = librosa.get_duration(y=y, sr=sr, hop_length=hop_length)
-        # hopSeconds = hop_length / sr
-
-        # Calculate tempo
-        onset = librosa.onset.onset_strength(y=y, sr=sr)
-        tempo = self._normalizeArray(librosa.beat.tempo(onset_envelope=onset, sr=sr, hop_length=hop_length, aggregate=None))
-
-        # Calculate the spectrogram
-        spectro = librosa.feature.melspectrogram(
-            y=y,
-            sr=sr,
-            n_mels=128,
-            fmax=8000,
-            hop_length=hop_length
-        )
-
-        # Calculate normalized mean power per hop
-        spectroMean = np.mean(spectro, axis=0)
-
-        # Calculate the delta of the spectrogram mean
-        spectroMeanDelta = librosa.feature.delta(spectroMean)
-
-        # Normalize the spectro mean
-        spectroMean = self._normalizeArray(spectroMean)
-
-        # Calculate pitch chroma for hops
-        chroma = librosa.feature.chroma_cqt(
-            y=y,
-            sr=sr,
-            hop_length=hop_length
-        )
-
-        # Get the mean of the chroma for each step
-        chromaMean = np.mean(chroma, axis=0)
-
-        # Calculate the output FPS
-        if fps_target <= 0:
-            # Calculate framerate based on audio
-            fps = len(tempo) / duration
-        else:
-            # Specific framerate to target
-            fps = fps_target
-
-        # Calculate desired frame count
-        desiredFrames = round(fps * duration)
-
-        # Resample audio features to match desired frame count
-        tempo = resample(tempo, desiredFrames)
-        spectroMean = resample(spectroMean, desiredFrames)
-        spectroMeanDelta = resample(spectroMeanDelta, desiredFrames)
-        chromaMean = resample(chromaMean, desiredFrames)
-
-        # Calculate the feature modifier for each frame
-        featModifiers = torch.Tensor(
-            [self._calcFeatModifier(
-                intensity,
-                tempo[i],
-                spectroMean[i],
-                spectroMeanDelta[i],
-                chromaMean[i],
-                modMax=feat_mod_max,
-                modMin=feat_mod_min
-            ) for i in range(desiredFrames)]
-        )
-
-        # Normalize the feature modifiers if requested
-        if feat_mod_normalize:
-            # NOTE: The feat_mod_max and feat_mod_min values will be inaccurate realtive to the now normalized featModifiers array and must be adjusted if used later.
-            featModifiers = self._normalizeArray(featModifiers, minVal=0.0, maxVal=featModifiers.max().item())
+        # Check if prompts are provided
+        if len(prompts) == 0:
+            raise ValueError("At least one prompt is required.")
 
         ## Generation
-        # Set intial prompts
-        promptCount = len(prompts)
-        if promptCount > 1:
-            # Calculate linear interpolation between prompts
-            promptSeq: Optional[InterpPromptSequence] = None
-            relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
-            for i in range(promptCount - 1):
-                # Calculate modifiers for this section
-                curModifiers = featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
-
-                # Build prompt interpolation
-                if promptSeq is None:
-                    # Start intial prompt sequence
-                    promptSeq = InterpPromptSequence(prompts[i], prompts[i + 1], curModifiers)
-                else:
-                    # Expand prompt sequence
-                    promptSeq.addToSequence(prompts[i], prompts[i + 1], curModifiers)
-
-            # Trim off any extra frames produced from ceil to int
-            promptSeq.trimToLength(desiredFrames)
-
-            # Set the initial prompt
-            promptPos = MbmPrompt.buildComfyUiPrompt(
-                promptSeq.positives[0],
-                promptSeq.positivePools[0]
-            )
-            promptNeg = MbmPrompt.buildComfyUiPrompt(
-                promptSeq.negatives[0],
-                promptSeq.negativePools[0]
-            )
-        elif promptCount == 1:
-            # Set single prompt
-            promptPos = prompts[0].positivePrompt()
-            promptNeg = prompts[0].negativePrompt()
-        else:
-            # No prompts
-            raise ValueError("No prompts were provided to the Music Visualizer node. At least one prompt is required.")
+        # Set the initial prompt
+        promptPos = MbmPrompt.buildComfyUiPrompt(
+            prompts[0].positive,
+            pool=prompts[0].positivePool
+        )
+        promptNeg = MbmPrompt.buildComfyUiPrompt(
+            prompts[0].negative,
+            pool=prompts[0].negativePool
+        )
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
@@ -260,7 +141,7 @@ class MusicVisualizer:
                 latentTensor,
                 latent_mode,
                 latent_mod_limit,
-                featModifiers[i]
+                latent_mods[i]
             )
 
             # Records the latent tensor's mean
@@ -268,7 +149,7 @@ class MusicVisualizer:
 
             # Set progress bar info
             pbar.set_postfix({
-                "feat": f"{featModifiers[i]:.2f}",
+                "mod": f"{latent_mods[i]:.2f}",
                 "prompt": f"{torch.mean(promptPos[0][0]):.4f}",
                 "latent": f"{latentTensorMeans[i]:.2f}"
             })
@@ -292,7 +173,6 @@ class MusicVisualizer:
             else:
                 outputTensor = torch.vstack((
                     outputTensor,
-                    # latentTensor,
                     imgTensor
                 ))
 
@@ -306,67 +186,45 @@ class MusicVisualizer:
             # Iterate the prompts as needed
             if (promptCount > 1) and ((i + 1) < desiredFrames):
                 promptPos = MbmPrompt.buildComfyUiPrompt(
-                    promptSeq.positives[i + 1],
-                    promptSeq.positivePools[i + 1]
+                    prompts[i + 1].positive,
+                    pool=prompts[i + 1].positivePool
                 )
                 promptNeg = MbmPrompt.buildComfyUiPrompt(
-                    promptSeq.negatives[i + 1],
-                    promptSeq.negativePools[i + 1]
+                    prompts[i + 1].negative,
+                    pool=prompts[i + 1].negativePool
                 )
 
         # Render charts
         chartImages = torch.vstack([
-            self._chartGenerationFeats(
-                {
-                    "seed": f"{seed} ({seed_mode})",
-                    "latent mode": latent_mode,
-                    "latent mod limit": f"{latent_mod_limit:.2f}",
-                    "intensity": f"{intensity:.2f}",
-                    "feat mod max": (f"{feat_mod_max:.2f}" if (feat_mod_max is not None) else "none"),
-                    "feat mod min": (f"{feat_mod_min:.2f}" if (feat_mod_min is not None) else "none"),
-                    "feat mod norm": ("yes" if feat_mod_normalize else "no"),
-                    "hop length": hop_length,
-                    "fps target": f"{fps_target:.2f}",
-                    "frames": desiredFrames
-                },
-                tempo,
-                spectroMean,
-                chromaMean,
-                featModifiers,
-                promptSeq.positives
-            ),
-            self._chartData(tempo, "Tempo"),
-            self._chartData(spectroMean, "Spectro Mean"),
-            self._chartData(spectroMeanDelta, "Spectro Mean Delta"),
-            self._chartData(chromaMean, "Chroma Mean"),
-            self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min),
-            self._chartData(latentTensorMeans, "Latent Means"),
-            self._chartData([torch.mean(c) for c in promptSeq.positives], "Positive Prompt"),
-            self._chartData([torch.mean(c) for c in promptSeq.negatives], "Negative Prompt")
+            # self._chartGenerationFeats( # TODO: How to do the combined chart?
+            #     {
+            #         "seed": f"{seed} ({seed_mode})",
+            #         "latent mode": latent_mode,
+            #         "latent mod limit": f"{latent_mod_limit:.2f}",
+            #         "intensity": f"{intensity:.2f}",
+            #         "feat mod max": (f"{feat_mod_max:.2f}" if (feat_mod_max is not None) else "none"),
+            #         "feat mod min": (f"{feat_mod_min:.2f}" if (feat_mod_min is not None) else "none"),
+            #         "feat mod norm": ("yes" if feat_mod_normalize else "no"),
+            #         "hop length": hop_length,
+            #         "fps target": f"{fps_target:.2f}",
+            #         "frames": desiredFrames
+            #     },
+            #     tempo,
+            #     spectroMean,
+            #     chromaMean,
+            #     featModifiers,
+            #     promptSeq.positives
+            # ),
+            chartData(latentTensorMeans, "Latent Means")
         ])
 
         # Return outputs
-        return ({"samples": outputTensor}, fps, chartImages)
+        return (
+            {"samples": outputTensor},
+            chartImages
+        )
 
-    # Private Functions
-    def _normalizeArray(self,
-            array: Union[np.ndarray, torch.Tensor],
-            minVal: float = 0.0,
-            maxVal: float = 1.0
-        ) -> Union[np.ndarray, torch.Tensor]:
-        """
-        Normalizes the given array between minVal and maxVal.
-
-        array: A Numpy array or a Tensor.
-        minVal: The minimum value of the normalized array.
-        maxVal: The maximum value of the normalized array.
-
-        Returns a normalized Numpy array or Tensor matching the `array` type.
-        """
-        arrayMin = torch.min(array) if isinstance(array, torch.Tensor) else np.min(array)
-        arrayMax = torch.max(array) if isinstance(array, torch.Tensor) else np.max(array)
-        return minVal + (array - arrayMin) * (maxVal - minVal) / (arrayMax - arrayMin)
-
+    # Internal Functions
     def _iterateLatentByMode(self,
             latent: torch.Tensor,
             latentMode: str,
@@ -436,37 +294,6 @@ class MusicVisualizer:
         # TODO: More specific noise range input?
         return torch.tensor(np.random.normal(3, 2.5, size=size))
 
-    def _calcFeatModifier(self,
-            intensity: float,
-            tempo: float,
-            spectroMean: float,
-            spectroMeanDelta: float,
-            chromaMean: float,
-            modMax: Optional[float] = None,
-            modMin: Optional[float] = None
-        ) -> float:
-        """
-        Calculates the overall feature modifier based on the provided audio features.
-
-        intensity: A modifier to increase (>1.0) or decrease (<1.0) the overall effect of the audio features.
-        tempo: The tempo for a single step of the audio.
-        spectroMean: The normalized mean power for a single step of the audio.
-        spectroMeanDelta: The delta of the normalized mean power for a single step of the audio.
-        chromaMean: The mean value of the chroma for a single step of the audio.
-        modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
-        modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
-
-        Returns the calculated overall feature modifier.
-        """
-        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
-
-        if (modMax is not None) and (modVal > modMax):
-            return modMax
-        elif (modMin is not None) and (modVal < modMin):
-            return modMin
-        else:
-            return modVal
-
     def _applyFeatToLatent(self,
             latent: torch.Tensor,
             method: str,
@@ -527,152 +354,44 @@ class MusicVisualizer:
             # Seed stays the same
             return seed
 
-    def _renderChart(self, fig: plt.Figure) -> torch.Tensor:
-        """
-        Renders the provided chart.
+    # def _chartGenerationFeats(self,
+    #         renderParams: dict[str, str],
+    #         tempo,
+    #         spectroMean,
+    #         chromaMean,
+    #         featModifiers,
+    #         promptSeqPos
+    #     ) -> torch.Tensor:
+    #     """
+    #     Creates a chart representing the entire generation flow.
 
-        fig: The chart to render.
+    #     renderParams: The parameters used to render the chart.
+    #     tempo: The tempo feature data.
+    #     spectroMean: The spectrogram mean feature data.
+    #     chromaMean: The chroma mean feature data.
+    #     featModifiers: The calculated feature modifiers.
+    #     promptSeqPos: The positive prompt sequence.
 
-        Returns a ComfyUI compatible Tensor image of the chart.
-        """
-        # Render the chart
-        fig.canvas.draw()
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format="png")
-        buffer.seek(0)
+    #     Returns a ComfyUI compatible Tensor image of the chart.
+    #     """
+    #     # Build the chart
+    #     fig, ax = plt.subplots(figsize=(20, 4))
 
-        # Convert to an image tensor
-        return torch.from_numpy(
-            np.array(
-                Image.open(buffer).convert("RGB")
-            ).astype(np.float32) / 255.0
-        )[None,]
+    #     ax.plot(self._normalizeArray(tempo), label="Tempo")
+    #     ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
+    #     ax.plot(self._normalizeArray(chromaMean), label="Chroma Mean")
+    #     ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
+    #     ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
 
-    def _chartData(self, data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = False) -> torch.Tensor:
-        """
-        Creates a chart of the provided data.
+    #     ax.legend()
+    #     ax.grid(True)
+    #     ax.set_title("Normalized Combined Data")
+    #     ax.set_xlabel("Index")
+    #     ax.set_ylabel("Value")
 
-        data: A numpy array or a Tensor to chart.
-        title: The title of the chart.
-        dotValues: If data points should be added as dots on top of the line.
+    #     # Add the render parameters
+    #     renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
+    #     ax.text(1.02, 0.5, renderParams, transform=ax.transAxes, va="center")
 
-        Returns a ComfyUI compatible Tensor image of the chart.
-        """
-        # Build the chart
-        fig, ax = plt.subplots(figsize=(20, 4))
-        ax.plot(data)
-        ax.grid(True)
-
-        if dotValues:
-            ax.scatter(range(len(data)), data, color="red")
-
-        ax.set_title(title)
-        ax.set_xlabel("Index")
-        ax.set_ylabel("Value")
-
-        # Render the chart
-        return self._renderChart(fig)
-
-    def _chartGenerationFeats(self,
-            renderParams: dict[str, str],
-            tempo,
-            spectroMean,
-            chromaMean,
-            featModifiers,
-            promptSeqPos
-        ) -> torch.Tensor:
-        """
-        Creates a chart representing the entire generation flow.
-
-        renderParams: The parameters used to render the chart.
-        tempo: The tempo feature data.
-        spectroMean: The spectrogram mean feature data.
-        chromaMean: The chroma mean feature data.
-        featModifiers: The calculated feature modifiers.
-        promptSeqPos: The positive prompt sequence.
-
-        Returns a ComfyUI compatible Tensor image of the chart.
-        """
-        # Build the chart
-        fig, ax = plt.subplots(figsize=(20, 4))
-
-        ax.plot(self._normalizeArray(tempo), label="Tempo")
-        ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
-        ax.plot(self._normalizeArray(chromaMean), label="Chroma Mean")
-        ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
-        ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
-
-        ax.legend()
-        ax.grid(True)
-        ax.set_title("Normalized Combined Data")
-        ax.set_xlabel("Index")
-        ax.set_ylabel("Value")
-
-        # Add the render parameters
-        renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
-        ax.text(1.02, 0.5, renderParams, transform=ax.transAxes, va="center")
-
-        # Render the chart
-        return self._renderChart(fig)
-
-    def _chartFeatMod(self,
-            featModifiers: torch.Tensor,
-            intensity: float,
-            isNormalized: bool,
-            modMax: Optional[float] = None,
-            modMin: Optional[float] = None
-        ) -> torch.Tensor:
-        """
-        Creates a chart representing the feature modifier.
-
-        featModifiers: The calculated feature modifiers.
-        intensity: The given intensity used in calculating the feature modifiers.
-        isNormalized: If the feature modifiers are normalized.
-        modMax: The maximum value the feature modifier can be. Provide `None` to display no maximum.
-        modMin: The minimum value the feature modifier can be. Provide `None` to display no minimum.
-
-        Returns a ComfyUI compatible Tensor image of the chart.
-        """
-        # Build the chart
-        fig, ax = plt.subplots(figsize=(20, 4))
-
-        ax.plot(featModifiers, label="Modifiers")
-
-        modMaxStr = "none"
-        if modMax is not None:
-            if isNormalized:
-                # Use logical value
-                modMaxAlt = featModifiers.max().item()
-                modMaxStr = f"{modMaxAlt:.2f} ({modMax:.2f})"
-                plt.axhline(y=modMaxAlt, linestyle="dotted", color="yellow", label="Mod Max")
-            else:
-                # Use prescribed value
-                modMaxStr = f"{modMax:.2f}"
-                plt.axhline(y=modMax, linestyle="dotted", color="yellow", label="Mod Max")
-
-        modMinStr = "none"
-        if modMin is not None:
-            if isNormalized:
-                # Use logical value
-                modMinStr = f"0 ({modMin:.2f})"
-                plt.axhline(y=0, linestyle="dotted", color="green", label="Mod Min")
-            else:
-                # Use prescribed value
-                modMinStr = f"{modMin:.2f}"
-                plt.axhline(y=modMin, linestyle="dotted", color="green", label="Mod Min")
-
-        ax.legend()
-        ax.grid(True)
-        ax.set_title("Feature Modifiers")
-        ax.set_xlabel("Index")
-        ax.set_ylabel("Value")
-
-        # Add feature information
-        featureInfo = f"Normalized: {('yes' if isNormalized else 'no')}\n"
-        featureInfo += f"Max: {modMaxStr}\n"
-        featureInfo += f"Min: {modMinStr}\n"
-        featureInfo += f"Intensity: {intensity:.2f}"
-        ax.text(1.02, 0.5, featureInfo, transform=ax.transAxes, va="center")
-
-        # Render the chart
-        return self._renderChart(fig)
+    #     # Render the chart
+    #     return self._renderChart(fig)
