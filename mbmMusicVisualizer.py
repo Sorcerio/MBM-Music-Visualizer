@@ -24,6 +24,7 @@ import comfy.samplers
 from nodes import common_ksampler
 
 from .mbmPromptSequence import MbmPrompt
+from .mbmInterpPromptSequence import InterpPromptSequence
 
 # Classes
 class MusicVisualizer:
@@ -213,77 +214,32 @@ class MusicVisualizer:
         promptCount = len(prompts)
         if promptCount > 1:
             # Calculate linear interpolation between prompts
-            promptSeqPos = None
-            promptSeqNeg = None
-            promptSeqPosPool = None
-            promptSeqNegPool = None
+            promptSeq: Optional[InterpPromptSequence] = None
             relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
             for i in range(promptCount - 1):
+                # Calculate modifiers for this section
                 curModifiers = featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
-                if promptSeqPos is None: # Keep it in Tensor space for efficiency.
-                    promptSeqPos = self._weightedInterpolation( # TODO: Clean this up
-                        prompts[i].positive,
-                        prompts[i + 1].positive,
-                        curModifiers
-                    )
-                    promptSeqNeg = self._weightedInterpolation(
-                        prompts[i].negative,
-                        prompts[i + 1].negative,
-                        curModifiers
-                    )
-                    promptSeqPosPool = self._weightedInterpolation(
-                        prompts[i].positivePool,
-                        prompts[i + 1].positivePool,
-                        curModifiers
-                    )
-                    promptSeqNegPool = self._weightedInterpolation(
-                        prompts[i].negativePool,
-                        prompts[i + 1].negativePool,
-                        curModifiers
-                    )
+
+                # Build prompt interpolation
+                if promptSeq is None:
+                    # Start intial prompt sequence
+                    promptSeq = InterpPromptSequence(prompts[i], prompts[i + 1], curModifiers)
                 else:
-                    promptSeqPos = torch.vstack((
-                        promptSeqPos,
-                        self._weightedInterpolation(
-                            prompts[i].positive,
-                            prompts[i + 1].positive,
-                            curModifiers
-                        )[1:]
-                    ))
-                    promptSeqNeg = torch.vstack((
-                        promptSeqNeg,
-                        self._weightedInterpolation(
-                            prompts[i].negative,
-                            prompts[i + 1].negative,
-                            curModifiers
-                        )[1:]
-                    ))
-                    promptSeqPosPool = torch.vstack((
-                        promptSeqPosPool,
-                        self._weightedInterpolation(
-                            prompts[i].positivePool,
-                            prompts[i + 1].positivePool,
-                            curModifiers
-                        )[1:]
-                    ))
-                    promptSeqNegPool = torch.vstack((
-                        promptSeqNegPool,
-                        self._weightedInterpolation(
-                            prompts[i].negativePool,
-                            prompts[i + 1].negativePool,
-                            curModifiers
-                        )[1:]
-                    ))
+                    # Expand prompt sequence
+                    promptSeq.addToSequence(prompts[i], prompts[i + 1], curModifiers)
 
             # Trim off any extra frames produced from ceil to int
-            promptSeqPos = promptSeqPos[:desiredFrames]
-            promptSeqNeg = promptSeqNeg[:desiredFrames]
-            promptSeqPosPool = promptSeqPosPool[:desiredFrames]
-            promptSeqNegPool = promptSeqNegPool[:desiredFrames]
+            promptSeq.trimToLength(desiredFrames)
 
-            # Set the initials prompt
-            promptPos = MbmPrompt.buildComfyUiPrompt(promptSeqPos[0], promptSeqPosPool[0])
-            promptNeg = MbmPrompt.buildComfyUiPrompt(promptSeqNeg[0], promptSeqNegPool[0])
+            # Set the initial prompt
+            promptPos = MbmPrompt.buildComfyUiPrompt(
+                promptSeq.positives[0],
+                promptSeq.positivePools[0]
+            )
+            promptNeg = MbmPrompt.buildComfyUiPrompt(
+                promptSeq.negatives[0],
+                promptSeq.negativePools[0]
+            )
         elif promptCount == 1:
             # Set single prompt
             promptPos = prompts[0].positivePrompt()
@@ -347,8 +303,14 @@ class MusicVisualizer:
 
             # Iterate the prompts as needed
             if (promptCount > 1) and ((i + 1) < desiredFrames):
-                promptPos = MbmPrompt.buildComfyUiPrompt(promptSeqPos[i + 1], promptSeqPosPool[i + 1])
-                promptNeg = MbmPrompt.buildComfyUiPrompt(promptSeqNeg[i + 1], promptSeqNegPool[i + 1])
+                promptPos = MbmPrompt.buildComfyUiPrompt(
+                    promptSeq.positives[i + 1],
+                    promptSeq.positivePools[i + 1]
+                )
+                promptNeg = MbmPrompt.buildComfyUiPrompt(
+                    promptSeq.negatives[i + 1],
+                    promptSeq.negativePools[i + 1]
+                )
 
         # Render charts
         chartImages = torch.vstack([
@@ -369,7 +331,7 @@ class MusicVisualizer:
                 spectroMean,
                 chromaMean,
                 featModifiers,
-                promptSeqPos
+                promptSeq.positives
             ),
             self._chartData(tempo, "Tempo"),
             self._chartData(spectroMean, "Spectro Mean"),
@@ -377,8 +339,8 @@ class MusicVisualizer:
             self._chartData(chromaMean, "Chroma Mean"),
             self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min),
             self._chartData(latentTensorMeans, "Latent Means"),
-            self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
-            self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
+            self._chartData([torch.mean(c) for c in promptSeq.positives], "Positive Prompt"),
+            self._chartData([torch.mean(c) for c in promptSeq.negatives], "Negative Prompt")
         ])
 
         # Return outputs
@@ -562,33 +524,6 @@ class MusicVisualizer:
         else: # SEED_MODE_FIXED
             # Seed stays the same
             return seed
-
-    def _weightedInterpolation(self, start: torch.Tensor, stop: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
-        """
-        Interpolates between `start` and `stop` based on the given `weights` for each step in the interpolation.
-
-        start: A Tensor of the same shape as `stop`.
-        stop: A Tensor of the same shape as `start`.
-        weights: A Tensor of weights to to use in each jump of the interpolation. This defines the number of gaps, not the total number of output Tensor elements.
-
-        Returns a Tensor of shape `[(length of weights + 1), *start.shape]` where each step is an interpolation between `start` and `stop`.
-        Includes the `start` or `stop` tensors in the output.
-        """
-        # Make sure weights are floats
-        weights = weights.float()
-
-        # Normalize weights
-        weights = weights / weights.sum()
-
-        # Calculate the cumulative sum of the weights
-        cumWeight = weights.cumsum(dim=0)
-
-        # Reshape the cumulative sum to allow for broadcasting
-        for _ in range(start.ndim): # [-1, *([1]*start.ndim)]
-            cumWeight = cumWeight.unsqueeze(-1)
-
-        # Interpolate with weights and add start
-        return torch.vstack([start.unsqueeze(0), (start[None] + cumWeight * (stop - start)[None])])
 
     def _renderChart(self, fig: plt.Figure) -> torch.Tensor:
         """
