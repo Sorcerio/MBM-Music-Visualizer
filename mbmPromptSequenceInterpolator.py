@@ -6,7 +6,7 @@ import torch
 import math
 from typing import Optional
 
-from .mbmPromptSequence import MbmPrompt
+from .mbmPrompt import MbmPrompt
 from .mbmInterpPromptSequence import InterpPromptSequence
 from .mbmMVShared import chartData
 
@@ -82,4 +82,3 @@ class PromptSequenceInterpolator:
             promptSeq,
             chartImages
         )
-
