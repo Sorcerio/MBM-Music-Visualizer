@@ -28,6 +28,8 @@ class MbmPrompt:
         self.positivePool = positivePool
         self.negativePool = negativePool
 
+        # TODO: Add additional "data" parameter for additional data to be stored with the prompt
+
     # Python Functions
     def __repr__(self) -> str:
         return f"MbmPrompt(positive={self.positive.shape}, negative={self.negative.shape}, positivePool={self.positivePool.shape if self.positivePool is not None else 'None'}, negativePool={self.negativePool.shape if self.negativePool is not None else 'None'})"

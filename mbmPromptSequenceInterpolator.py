@@ -56,42 +56,34 @@ class PromptSequenceInterpolator:
         # Set intial prompts
         if promptCount > 1:
             # Calculate linear interpolation between prompts
-            promptSeq: Optional[InterpPromptSequence] = None
+            interpPromptSeq: Optional[InterpPromptSequence] = None
             relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
             for i in range(promptCount - 1):
                 # Calculate modifiers for this section
                 curModifiers = feat_mods[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
 
                 # Build prompt interpolation
-                if promptSeq is None:
+                if interpPromptSeq is None:
                     # Start intial prompt sequence
-                    promptSeq = InterpPromptSequence(prompts[i], prompts[i + 1], curModifiers)
+                    interpPromptSeq = InterpPromptSequence(prompts[i], prompts[i + 1], curModifiers)
                 else:
                     # Expand prompt sequence
-                    promptSeq.addToSequence(prompts[i], prompts[i + 1], curModifiers)
+                    interpPromptSeq.addToSequence(prompts[i], prompts[i + 1], curModifiers)
 
             # Trim off any extra frames produced from ceil to int
-            promptSeq.trimToLength(desiredFrames)
+            interpPromptSeq.trimToLength(desiredFrames)
 
-            # Set the initial prompt
-            promptPos = MbmPrompt.buildComfyUiPrompt(
-                promptSeq.positives[0],
-                promptSeq.positivePools[0]
-            )
-            promptNeg = MbmPrompt.buildComfyUiPrompt(
-                promptSeq.negatives[0],
-                promptSeq.negativePools[0]
-            )
+            # Build the prompt sequence
+            promptSeq = interpPromptSeq.asPromptSequence()
         elif promptCount == 1:
-            # Set single prompt
-            promptPos = prompts[0].positivePrompt()
-            promptNeg = prompts[0].negativePrompt()
+            # Send it onward
+            promptSeq = prompts
         else:
-            # No prompts
-            raise ValueError("No prompts were provided to the Music Visualizer node. At least one prompt is required.")
+            # No prompts my guy
+            raise ValueError("At least one prompt is required.")
 
         return (
-            # TODO: prompt sequence
+            promptSeq,
             # TODO: charts
         )
 

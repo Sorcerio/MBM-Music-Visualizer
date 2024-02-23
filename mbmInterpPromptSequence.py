@@ -1,5 +1,5 @@
 # MBM's Music Visualizer: Interpolated Prompt Sequence
-# Represents and facilitates building of a sequence of interpolated prompts.
+# Represents and facilitates building of a sequence of prompts with weighted interpolation.
 
 # Imports
 import torch
@@ -9,7 +9,7 @@ from .mbmPromptSequence import MbmPrompt
 # Classes
 class InterpPromptSequence:
     """
-    Represents and facilitates building of a sequence of interpolated prompts.
+    Represents and facilitates building of a sequence of prompts with weighted interpolation.
     """
     # Constructor
     def __init__(self, start: MbmPrompt, end: MbmPrompt, modifiers: torch.Tensor) -> None:
@@ -92,6 +92,20 @@ class InterpPromptSequence:
         self.negatives = self.negatives[:length]
         self.positivePools = self.positivePools[:length]
         self.negativePools = self.negativePools[:length]
+
+    def asPromptSequence(self) -> list[MbmPrompt]:
+        """
+        Returns the sequence as a list of MbmPrompt objects.
+        """
+        return [
+            MbmPrompt(
+                self.positives[i],
+                self.negatives[i],
+                positivePool=self.positivePools[i],
+                negativePool=self.negativePools[i]
+            )
+            for i in range(len(self.positives))
+        ]
 
     def _weightedInterpolation(self, start: torch.Tensor, stop: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
         """
