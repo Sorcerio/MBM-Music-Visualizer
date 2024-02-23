@@ -20,8 +20,8 @@ class AudioFeatureCalculator:
     DEF_FEAT_MOD_MAX = 10000.0
     DEF_FEAT_MOD_MIN = -10000.0
 
-    RETURN_TYPES = ("LIST", "FLOAT", "IMAGE")
-    RETURN_NAMES = ("FEATURES", "FPS", "CHARTS")
+    RETURN_TYPES = ("TENSOR_1D", "FLOAT", "IMAGE")
+    RETURN_NAMES = ("FEAT_MODS", "FPS", "CHARTS")
     FUNCTION = "process"
     CATEGORY = "MBMnodes/Audio"
 
