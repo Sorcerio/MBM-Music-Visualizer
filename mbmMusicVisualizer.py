@@ -1,6 +1,8 @@
 # MBM's Music Visualizer: The Visualizer
 # Visualize a provided audio file.
 
+# TODO: Split image generation, audio processing, and chart generation into separate nodes.
+
 # TODO: Feature: Add filebased input (json) for prompt sequence.
 # TODO: Feature: Add ability to specify specific timecodes for prompts.
 # TODO: Feature: Add ability to use a hash (?) of a latent (image?) to generate a dummy (random?) audio input.
@@ -431,7 +433,7 @@ class MusicVisualizer:
 
         Returns the latent tensor.
         """
-        # TODO: More specific noise range input
+        # TODO: More specific noise range input?
         return torch.tensor(np.random.normal(3, 2.5, size=size))
 
     def _calcFeatModifier(self,
