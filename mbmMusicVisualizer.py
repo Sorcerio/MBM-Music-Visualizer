@@ -157,6 +157,9 @@ class MusicVisualizer:
         # Calculate normalized mean power per hop
         spectroMean = np.mean(spectro, axis=0)
 
+        # Calculate the delta of the spectrogram mean
+        spectroMeanDelta = librosa.feature.delta(spectroMean)
+
         # Normalize the spectro mean
         spectroMean = self._normalizeArray(spectroMean)
 
@@ -184,6 +187,7 @@ class MusicVisualizer:
         # Resample audio features to match desired frame count
         tempo = resample(tempo, desiredFrames)
         spectroMean = resample(spectroMean, desiredFrames)
+        spectroMeanDelta = resample(spectroMeanDelta, desiredFrames)
         chromaMean = resample(chromaMean, desiredFrames)
 
         # Calculate the feature modifier for each frame
@@ -192,6 +196,7 @@ class MusicVisualizer:
                 intensity,
                 tempo[i],
                 spectroMean[i],
+                spectroMeanDelta[i],
                 chromaMean[i],
                 modMax=feat_mod_max,
                 modMin=feat_mod_min
@@ -216,7 +221,7 @@ class MusicVisualizer:
             for i in range(promptCount - 1):
                 curModifiers = featModifiers[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
                 if promptSeqPos is None: # Keep it in Tensor space for efficiency.
-                    promptSeqPos = self._weightedInterpolation(
+                    promptSeqPos = self._weightedInterpolation( # TODO: Clean this up
                         prompts[i].positive,
                         prompts[i + 1].positive,
                         curModifiers
@@ -368,8 +373,9 @@ class MusicVisualizer:
             ),
             self._chartData(tempo, "Tempo"),
             self._chartData(spectroMean, "Spectro Mean"),
+            self._chartData(spectroMeanDelta, "Spectro Mean Delta"),
             self._chartData(chromaMean, "Chroma Mean"),
-            self._chartFeatMod(featModifiers, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min),
+            self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min),
             self._chartData(latentTensorMeans, "Latent Means"),
             self._chartData([torch.mean(c) for c in promptSeqPos], "Positive Prompt"),
             self._chartData([torch.mean(c) for c in promptSeqNeg], "Negative Prompt")
@@ -470,6 +476,7 @@ class MusicVisualizer:
             intensity: float,
             tempo: float,
             spectroMean: float,
+            spectroMeanDelta: float,
             chromaMean: float,
             modMax: Optional[float] = None,
             modMin: Optional[float] = None
@@ -480,13 +487,14 @@ class MusicVisualizer:
         intensity: A modifier to increase (>1.0) or decrease (<1.0) the overall effect of the audio features.
         tempo: The tempo for a single step of the audio.
         spectroMean: The normalized mean power for a single step of the audio.
+        spectroMeanDelta: The delta of the normalized mean power for a single step of the audio.
         chromaMean: The mean value of the chroma for a single step of the audio.
         modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
         modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
 
         Returns the calculated overall feature modifier.
         """
-        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * intensity)
+        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
 
         if (modMax is not None) and (modVal > modMax):
             return modMax
@@ -642,6 +650,7 @@ class MusicVisualizer:
         renderParams: The parameters used to render the chart.
         tempo: The tempo feature data.
         spectroMean: The spectrogram mean feature data.
+        chromaMean: The chroma mean feature data.
         featModifiers: The calculated feature modifiers.
         promptSeqPos: The positive prompt sequence.
 
@@ -650,15 +659,15 @@ class MusicVisualizer:
         # Build the chart
         fig, ax = plt.subplots(figsize=(20, 4))
 
-        ax.plot(self._normalizeArray(tempo), label="Tempo") 
+        ax.plot(self._normalizeArray(tempo), label="Tempo")
         ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
         ax.plot(self._normalizeArray(chromaMean), label="Chroma Mean")
         ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
         ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
-    
+
         ax.legend()
         ax.grid(True)
-        ax.set_title("Combined")
+        ax.set_title("Normalized Combined Data")
         ax.set_xlabel("Index")
         ax.set_ylabel("Value")
 
@@ -671,6 +680,7 @@ class MusicVisualizer:
 
     def _chartFeatMod(self,
             featModifiers: torch.Tensor,
+            intensity: float,
             isNormalized: bool,
             modMax: Optional[float] = None,
             modMin: Optional[float] = None
@@ -679,6 +689,7 @@ class MusicVisualizer:
         Creates a chart representing the feature modifier.
 
         featModifiers: The calculated feature modifiers.
+        intensity: The given intensity used in calculating the feature modifiers.
         isNormalized: If the feature modifiers are normalized.
         modMax: The maximum value the feature modifier can be. Provide `None` to display no maximum.
         modMin: The minimum value the feature modifier can be. Provide `None` to display no minimum.
@@ -722,7 +733,8 @@ class MusicVisualizer:
         # Add feature information
         featureInfo = f"Normalized: {('yes' if isNormalized else 'no')}\n"
         featureInfo += f"Max: {modMaxStr}\n"
-        featureInfo += f"Min: {modMinStr}"
+        featureInfo += f"Min: {modMinStr}\n"
+        featureInfo += f"Intensity: {intensity:.2f}"
         ax.text(1.02, 0.5, featureInfo, transform=ax.transAxes, va="center")
 
         # Render the chart
