@@ -1,7 +1,5 @@
-# MBM's Music Visualizer: The Visualizer
-# Visualize a provided audio file.
-
-# TODO: Split image generation, audio processing, and chart generation into separate nodes.
+# MBM's Music Visualizer: Prompt Sequence Renderer
+# Renders a prompt sequence into a set of images.
 
 # TODO: Feature: Add filebased input (json) for prompt sequence.
 # TODO: Feature: Add ability to specify specific timecodes for prompts.
@@ -29,11 +27,9 @@ from .mbmPrompt import MbmPrompt
 from .mbmMVShared import chartData
 
 # Classes
-class MusicVisualizer: # TODO: rename
+class PromptSequenceRenderer: # TODO: rename
     """
-    Visualize a provided audio file.
-
-    Returns a batch tuple of images.
+    Renders a prompt sequence into a set of images.
     """
     # Class Constants
     SEED_MODE_FIXED = "fixed"
@@ -54,7 +50,7 @@ class MusicVisualizer: # TODO: rename
     RETURN_TYPES = ("LATENT", "IMAGE")
     RETURN_NAMES = ("LATENTS", "CHARTS")
     FUNCTION = "process"
-    CATEGORY = "MBMnodes/Audio"
+    CATEGORY = "MBMnodes/Prompts"
 
     # Constructor
     def __init__(self):
@@ -69,8 +65,8 @@ class MusicVisualizer: # TODO: rename
                 "latent_mods": ("TENSOR_1D", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "latent_image": ("LATENT", ),
-                "seed_mode": ([MusicVisualizer.SEED_MODE_FIXED, MusicVisualizer.SEED_MODE_RANDOM, MusicVisualizer.SEED_MODE_INCREASE, MusicVisualizer.SEED_MODE_DECREASE], ),
-                "latent_mode": ([MusicVisualizer.LATENT_MODE_BOUNCE, MusicVisualizer.LATENT_MODE_FLOW, MusicVisualizer.LATENT_MODE_STATIC, MusicVisualizer.LATENT_MODE_INCREASE, MusicVisualizer.LATENT_MODE_DECREASE, MusicVisualizer.LATENT_MODE_GAUSS], ),
+                "seed_mode": ([s.SEED_MODE_FIXED, s.SEED_MODE_RANDOM, s.SEED_MODE_INCREASE, s.SEED_MODE_DECREASE], ),
+                "latent_mode": ([s.LATENT_MODE_BOUNCE, s.LATENT_MODE_FLOW, s.LATENT_MODE_STATIC, s.LATENT_MODE_INCREASE, s.LATENT_MODE_DECREASE, s.LATENT_MODE_GAUSS], ),
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "latent_mod_limit": ("FLOAT", {"default": 5.0, "min": -1.0, "max": 10000.0}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
 
@@ -113,7 +109,7 @@ class MusicVisualizer: # TODO: rename
 
         ## Validation
         # Make sure if bounce mode is used that the latent mod limit is set
-        if (latent_mode == MusicVisualizer.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
+        if (latent_mode == self.LATENT_MODE_BOUNCE) and (latent_mod_limit <= 0):
             raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
 
         # Check if prompts are provided
@@ -242,14 +238,14 @@ class MusicVisualizer: # TODO: rename
         Returns the iterated latent tensor.
         """
         # Decide what to do if in flow mode
-        if latentMode == MusicVisualizer.LATENT_MODE_FLOW:
+        if latentMode == self.LATENT_MODE_FLOW:
             # Each hop will add or subtract, based on the audio features, from the last latent
             if random.random() < 0.5:
-                latentMode = MusicVisualizer.LATENT_MODE_INCREASE
+                latentMode = self.LATENT_MODE_INCREASE
             else:
-                latentMode = MusicVisualizer.LATENT_MODE_DECREASE
+                latentMode = self.LATENT_MODE_DECREASE
 
-        if latentMode == MusicVisualizer.LATENT_MODE_BOUNCE:
+        if latentMode == self.LATENT_MODE_BOUNCE:
             # Increases to to the `modLimit`, then decreases to `-modLimit`, and loops as many times as needed building on the last latent
             if modLimit > 0:
                 # Do the bounce operation
@@ -260,23 +256,23 @@ class MusicVisualizer: # TODO: rename
                 # Check if within bounds
                 if -modLimit <= nextValue <= modLimit:
                     # Within bounds
-                    latentMode = MusicVisualizer.LATENT_MODE_INCREASE if self.__isBouncingUp else MusicVisualizer.LATENT_MODE_DECREASE
+                    latentMode = self.LATENT_MODE_INCREASE if self.__isBouncingUp else self.LATENT_MODE_DECREASE
                 else:
                     # Outside of bounds
-                    latentMode = MusicVisualizer.LATENT_MODE_DECREASE if self.__isBouncingUp else MusicVisualizer.LATENT_MODE_INCREASE
+                    latentMode = self.LATENT_MODE_DECREASE if self.__isBouncingUp else self.LATENT_MODE_INCREASE
                     self.__isBouncingUp = not self.__isBouncingUp
             else:
                 # No limit so just increase
-                latentMode = MusicVisualizer.LATENT_MODE_INCREASE
+                latentMode = self.LATENT_MODE_INCREASE
 
         # Decide what to do based on mode
-        if latentMode == MusicVisualizer.LATENT_MODE_INCREASE:
+        if latentMode == self.LATENT_MODE_INCREASE:
             # Each hop adds, based on the audio features, to the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_ADD, modLimit, modifier)
-        elif latentMode == MusicVisualizer.LATENT_MODE_DECREASE:
+            return self._applyFeatToLatent(latent, self.FEAT_APPLY_METHOD_ADD, modLimit, modifier)
+        elif latentMode == self.LATENT_MODE_DECREASE:
             # Each hop subtracts, based on the audio features, from the last latent
-            return self._applyFeatToLatent(latent, MusicVisualizer.FEAT_APPLY_METHOD_SUBTRACT, modLimit, modifier)
-        elif latentMode == MusicVisualizer.LATENT_MODE_GAUSS:
+            return self._applyFeatToLatent(latent, self.FEAT_APPLY_METHOD_SUBTRACT, modLimit, modifier)
+        elif latentMode == self.LATENT_MODE_GAUSS:
             # Each hop creates a new latent with guassian noise
             return self._createLatent(latent.shape)
         else: # LATENT_MODE_STATIC
@@ -311,7 +307,7 @@ class MusicVisualizer: # TODO: rename
         Returns the modified latent tensor.
         """
         # Apply features to every point in the latent
-        if method == MusicVisualizer.FEAT_APPLY_METHOD_ADD:
+        if method == self.FEAT_APPLY_METHOD_ADD:
             # Add the features to the latent
             # Check if mean will be exceeded
             if (modLimit > 0) and (torch.mean(latent) + modifier) > modLimit:
@@ -341,13 +337,13 @@ class MusicVisualizer: # TODO: rename
 
         Returns the iterated seed.
         """
-        if seedMode == MusicVisualizer.SEED_MODE_RANDOM:
+        if seedMode == self.SEED_MODE_RANDOM:
             # Seed is random every hop
             return random.randint(0, 0xffffffffffffffff)
-        elif seedMode == MusicVisualizer.SEED_MODE_INCREASE:
+        elif seedMode == self.SEED_MODE_INCREASE:
             # Seed increases by 1 every hop
             return seed + 1
-        elif seedMode == MusicVisualizer.SEED_MODE_DECREASE:
+        elif seedMode == self.SEED_MODE_DECREASE:
             # Seed decreases by 1 every hop
             return seed - 1
         else: # SEED_MODE_FIXED

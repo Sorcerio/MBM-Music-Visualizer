@@ -3,10 +3,10 @@
 # Imports
 from .mbmAudioFeatureCalculator import AudioFeatureCalculator
 from .mbmAudioLoader import AudioLoader
-from .mbmMusicVisualizer import MusicVisualizer
+from .mbmPromptSequenceRenderer import PromptSequenceRenderer
 from .mbmPromptSequence import PromptSequenceBuilder
 from .mbmPromptSequenceInterpolator import PromptSequenceInterpolator
-from .mbmImageConcat  import ImageConcatenator
+from .mbmImageConcat import ImageConcatenator
 
 # A dictionary that contains all nodes you want to export with their names
 # NOTE: names should be globally unique
@@ -14,7 +14,7 @@ NODE_CLASS_MAPPINGS = {
     # "id": Class
     "mbmAudioFeatureCalculator": AudioFeatureCalculator,
     "mbmAudioLoader": AudioLoader,
-    "mbmMusicVisuzalizer": MusicVisualizer,
+    "mbmPromptSequenceRenderer": PromptSequenceRenderer,
     "mbmPromptSequenceBuilder": PromptSequenceBuilder,
     "mbmPromptSequenceInterpolator": PromptSequenceInterpolator,
     "mbmImageConcat": ImageConcatenator
@@ -25,7 +25,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     # "id": "readable"
     "mbmAudioFeatureCalculator": "Audio Feature Calculator",
     "mbmAudioLoader": "Audio Loader",
-    "mbmMusicVisuzalizer": "Music Visualizer",
+    "mbmPromptSequenceRenderer": "Prompt Sequence Renderer",
     "mbmPromptSequenceBuilder": "Prompt Sequence Builder",
     "mbmPromptSequenceInterpolator": "Prompt Sequence Interpolator",
     "mbmImageConcat": "Image Concatenator"
