@@ -3,9 +3,12 @@
 
 # Imports
 import os
+import io
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 from typing import Union
+from PIL import Image
 
 # Constants
 AUDIO_EXTENSIONS = ("wav", "mp3", "ogg", "flac")
@@ -41,3 +44,49 @@ def normalizeArray(
     arrayMin = torch.min(array) if isinstance(array, torch.Tensor) else np.min(array)
     arrayMax = torch.max(array) if isinstance(array, torch.Tensor) else np.max(array)
     return minVal + (array - arrayMin) * (maxVal - minVal) / (arrayMax - arrayMin)
+
+def renderChart(fig: plt.Figure) -> torch.Tensor:
+        """
+        Renders the provided chart.
+
+        fig: The chart to render.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Render the chart
+        fig.canvas.draw()
+        buffer = io.BytesIO()
+        fig.savefig(buffer, format="png")
+        buffer.seek(0)
+
+        # Convert to an image tensor
+        return torch.from_numpy(
+            np.array(
+                Image.open(buffer).convert("RGB")
+            ).astype(np.float32) / 255.0
+        )[None,]
+
+def chartData(data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = False) -> torch.Tensor:
+    """
+    Creates a chart of the provided data.
+
+    data: A numpy array or a Tensor to chart.
+    title: The title of the chart.
+    dotValues: If data points should be added as dots on top of the line.
+
+    Returns a ComfyUI compatible Tensor image of the chart.
+    """
+    # Build the chart
+    fig, ax = plt.subplots(figsize=(20, 4))
+    ax.plot(data)
+    ax.grid(True)
+
+    if dotValues:
+        ax.scatter(range(len(data)), data, color="red")
+
+    ax.set_title(title)
+    ax.set_xlabel("Index")
+    ax.set_ylabel("Value")
+
+    # Render the chart
+    return renderChart(fig)

@@ -4,22 +4,12 @@
 # Imports
 import librosa
 import torch
-import random
-import math
-import io
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Union, Optional
-from tqdm import tqdm
+from typing import Optional
 from scipy.signal import resample
-from PIL import Image
 
-import comfy.samplers
-from nodes import common_ksampler
-
-from .mbmPromptSequence import MbmPrompt
-from .mbmInterpPromptSequence import InterpPromptSequence
-from .mbmMVShared import normalizeArray
+from .mbmMVShared import normalizeArray, chartData, renderChart
 
 # Classes
 class AudioFeatureCalculator:
@@ -149,10 +139,19 @@ class AudioFeatureCalculator:
             # NOTE: The feat_mod_max and feat_mod_min values will be inaccurate realtive to the now normalized featModifiers array and must be adjusted if used later.
             featModifiers = normalizeArray(featModifiers, minVal=0.0, maxVal=featModifiers.max().item())
 
+        # Build the charts
+        chartImages = torch.vstack([
+            chartData(tempo, "Tempo"),
+            chartData(spectroMean, "Spectrogram Mean"),
+            chartData(spectroMeanDelta, "Spectrogram Mean Delta"),
+            chartData(chromaMean, "Chroma Mean"),
+            self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min)
+        ])
+
         return (
             featModifiers,
             fps,
-            # TODO: charts
+            chartImages
         )
     
     # Internal Functions
@@ -186,3 +185,65 @@ class AudioFeatureCalculator:
             return modMin
         else:
             return modVal
+
+    def _chartFeatMod(self,
+            featModifiers: torch.Tensor,
+            intensity: float,
+            isNormalized: bool,
+            modMax: Optional[float] = None,
+            modMin: Optional[float] = None
+        ) -> torch.Tensor:
+        """
+        Creates a chart representing the feature modifier.
+
+        featModifiers: The calculated feature modifiers.
+        intensity: The given intensity used in calculating the feature modifiers.
+        isNormalized: If the feature modifiers are normalized.
+        modMax: The maximum value the feature modifier can be. Provide `None` to display no maximum.
+        modMin: The minimum value the feature modifier can be. Provide `None` to display no minimum.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Build the chart
+        fig, ax = plt.subplots(figsize=(20, 4))
+
+        ax.plot(featModifiers, label="Modifiers")
+
+        modMaxStr = "none"
+        if modMax is not None:
+            if isNormalized:
+                # Use logical value
+                modMaxAlt = featModifiers.max().item()
+                modMaxStr = f"{modMaxAlt:.2f} ({modMax:.2f})"
+                plt.axhline(y=modMaxAlt, linestyle="dotted", color="yellow", label="Mod Max")
+            else:
+                # Use prescribed value
+                modMaxStr = f"{modMax:.2f}"
+                plt.axhline(y=modMax, linestyle="dotted", color="yellow", label="Mod Max")
+
+        modMinStr = "none"
+        if modMin is not None:
+            if isNormalized:
+                # Use logical value
+                modMinStr = f"0 ({modMin:.2f})"
+                plt.axhline(y=0, linestyle="dotted", color="green", label="Mod Min")
+            else:
+                # Use prescribed value
+                modMinStr = f"{modMin:.2f}"
+                plt.axhline(y=modMin, linestyle="dotted", color="green", label="Mod Min")
+
+        ax.legend()
+        ax.grid(True)
+        ax.set_title("Feature Modifiers")
+        ax.set_xlabel("Index")
+        ax.set_ylabel("Value")
+
+        # Add feature information
+        featureInfo = f"Normalized: {('yes' if isNormalized else 'no')}\n"
+        featureInfo += f"Max: {modMaxStr}\n"
+        featureInfo += f"Min: {modMinStr}\n"
+        featureInfo += f"Intensity: {intensity:.2f}"
+        ax.text(1.02, 0.5, featureInfo, transform=ax.transAxes, va="center")
+
+        # Render the chart
+        return renderChart(fig)
