@@ -97,9 +97,12 @@ class PromptSequenceBuilderAdvanced(PromptSequenceBuilder):
         promptsOut = super().process(positive_1, negative_1, positive_2, negative_2, prompts)
 
         # Add the sequence data
-        promptsOut[0][-1].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_1)
-
-        if (positive_2 is not None):
-            promptsOut[0][-2].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_2)
+        if (positive_2 is None):
+            # Add data to only the last prompt
+            promptsOut[0][-1].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_1)
+        else:
+            # Add data to the proper prompts
+            promptsOut[0][-2].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_1)
+            promptsOut[0][-1].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_2)
 
         return promptsOut

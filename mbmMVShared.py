@@ -46,25 +46,25 @@ def normalizeArray(
     return minVal + (array - arrayMin) * (maxVal - minVal) / (arrayMax - arrayMin)
 
 def renderChart(fig: plt.Figure) -> torch.Tensor:
-        """
-        Renders the provided chart.
+    """
+    Renders the provided chart.
 
-        fig: The chart to render.
+    fig: The chart to render.
 
-        Returns a ComfyUI compatible Tensor image of the chart.
-        """
-        # Render the chart
-        fig.canvas.draw()
-        buffer = io.BytesIO()
-        fig.savefig(buffer, format="png")
-        buffer.seek(0)
+    Returns a ComfyUI compatible Tensor image of the chart.
+    """
+    # Render the chart
+    fig.canvas.draw()
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format="png")
+    buffer.seek(0)
 
-        # Convert to an image tensor
-        return torch.from_numpy(
-            np.array(
-                Image.open(buffer).convert("RGB")
-            ).astype(np.float32) / 255.0
-        )[None,]
+    # Convert to an image tensor
+    return torch.from_numpy(
+        np.array(
+            Image.open(buffer).convert("RGB")
+        ).astype(np.float32) / 255.0
+    )[None,]
 
 def chartData(data: Union[np.ndarray, torch.Tensor], title: str, dotValues: bool = False) -> torch.Tensor:
     """

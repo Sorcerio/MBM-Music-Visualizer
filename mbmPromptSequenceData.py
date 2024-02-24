@@ -23,7 +23,8 @@ class PromptSequenceData:
 
     # Python Functions
     def __repr__(self) -> str:
-        return f"PromptSequenceData({', '.join(self.__dict__)})"
+        contents = [f"{k} = {v}" for k, v in self.__dict__.items()]
+        return f"PromptSequenceData({', '.join(contents)})"
 
     # Static Functions
     @staticmethod
