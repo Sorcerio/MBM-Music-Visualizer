@@ -1,5 +1,5 @@
 # MBM's Music Visualizer: MBM Prompt
-# Easier to work with Prompt data container class since ComfyUI just stores them unannotated lists and embedded dictionaries.
+# Easier to work with Prompt data container class since ComfyUI just stores them in unannotated lists and embedded dictionaries.
 
 # Imports
 import torch
@@ -8,7 +8,7 @@ from typing import Optional, Union
 # Classes
 class MbmPrompt:
     """
-    Easier to work with Prompt data container class since ComfyUI just stores them unannotated lists and embedded dictionaries.
+    Easier to work with Prompt data container class since ComfyUI just stores them in unannotated lists and embedded dictionaries.
     """
     # Constructor
     def __init__(self,
@@ -27,8 +27,7 @@ class MbmPrompt:
         self.negative = negative
         self.positivePool = positivePool
         self.negativePool = negativePool
-
-        # TODO: Add additional "data" parameter for additional data to be stored with the prompt
+        self.data = {}
 
     # Python Functions
     def __repr__(self) -> str:
