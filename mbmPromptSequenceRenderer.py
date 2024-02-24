@@ -7,18 +7,14 @@
 # TODO: Feature: Add camera effects similar to Scene Weaver.
 # TODO: Feature: Add ability to drag in audio files to the loader.
 
+# TODO: Test: Optimize by using previous image for N number of frames if the delta is small enough.
+#   ie: You render more frames for areas of high change and less for areas of low change, but retain the same overall FPS/etc.
+
 # Imports
-import librosa
 import torch
 import random
-import math
-import io
 import numpy as np
-import matplotlib.pyplot as plt
-from typing import Union, Optional
 from tqdm import tqdm
-from scipy.signal import resample
-from PIL import Image
 
 import comfy.samplers
 from nodes import common_ksampler
@@ -104,8 +100,7 @@ class PromptSequenceRenderer:
         np.random.default_rng(seed)
 
         # Get the counts
-        desiredFrames = len(prompts[0].positive)
-        promptCount = len(prompts)
+        desiredFrames = len(prompts)
 
         ## Validation
         # Make sure if bounce mode is used that the latent mod limit is set
@@ -113,7 +108,7 @@ class PromptSequenceRenderer:
             raise ValueError("Latent Mod Limit must be set to `>0` when using the `bounce` Latent Mode")
 
         # Check if prompts are provided
-        if len(prompts) == 0:
+        if desiredFrames < 1:
             raise ValueError("At least one prompt is required.")
 
         ## Generation
@@ -152,17 +147,17 @@ class PromptSequenceRenderer:
 
             # Generate the image
             imgTensor = common_ksampler(
-                    model,
-                    seed,
-                    steps,
-                    cfg,
-                    sampler_name,
-                    scheduler,
-                    promptPos,
-                    promptNeg,
-                    {"samples": latentTensor}, # ComfyUI, why package it?
-                    denoise=denoise
-                )[0]["samples"]
+                model,
+                seed,
+                steps,
+                cfg,
+                sampler_name,
+                scheduler,
+                promptPos,
+                promptNeg,
+                {"samples": latentTensor}, # ComfyUI, why package it?
+                denoise=denoise
+            )[0]["samples"]
 
             if outputTensor is None:
                 outputTensor = imgTensor
@@ -180,7 +175,7 @@ class PromptSequenceRenderer:
             seed = self._iterateSeedByMode(seed, seed_mode)
 
             # Iterate the prompts as needed
-            if (promptCount > 1) and ((i + 1) < desiredFrames):
+            if (desiredFrames > 1) and ((i + 1) < desiredFrames):
                 promptPos = MbmPrompt.buildComfyUiPrompt(
                     prompts[i + 1].positive,
                     pool=prompts[i + 1].positivePool
@@ -350,7 +345,7 @@ class PromptSequenceRenderer:
             # Seed stays the same
             return seed
 
-    # def _chartGenerationFeats(self,
+    # def _chartGenerationFeats(self, # TODO: Overhaul readability. Dotted except for feature modifiers?
     #         renderParams: dict[str, str],
     #         tempo,
     #         spectroMean,
