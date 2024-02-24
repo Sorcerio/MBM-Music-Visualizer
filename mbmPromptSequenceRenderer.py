@@ -113,14 +113,8 @@ class PromptSequenceRenderer:
 
         ## Generation
         # Set the initial prompt
-        promptPos = MbmPrompt.buildComfyUiPrompt(
-            prompts[0].positive,
-            pool=prompts[0].positivePool
-        )
-        promptNeg = MbmPrompt.buildComfyUiPrompt(
-            prompts[0].negative,
-            pool=prompts[0].negativePool
-        )
+        promptPos = prompts[0].positivePrompt()
+        promptNeg = prompts[0].negativePrompt()
 
         # Prepare latent output tensor
         outputTensor: torch.Tensor = None
@@ -176,14 +170,8 @@ class PromptSequenceRenderer:
 
             # Iterate the prompts as needed
             if (desiredFrames > 1) and ((i + 1) < desiredFrames):
-                promptPos = MbmPrompt.buildComfyUiPrompt(
-                    prompts[i + 1].positive,
-                    pool=prompts[i + 1].positivePool
-                )
-                promptNeg = MbmPrompt.buildComfyUiPrompt(
-                    prompts[i + 1].negative,
-                    pool=prompts[i + 1].negativePool
-                )
+                promptPos = prompts[i + 1].positivePrompt()
+                promptNeg = prompts[i + 1].negativePrompt()
 
         # Render charts
         chartImages = torch.vstack([
