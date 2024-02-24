@@ -20,8 +20,8 @@ class AudioFeatureCalculator:
     DEF_FEAT_MOD_MAX = 10000.0
     DEF_FEAT_MOD_MIN = -10000.0
 
-    RETURN_TYPES = ("TENSOR_1D", "FLOAT", "IMAGE")
-    RETURN_NAMES = ("FEAT_MODS", "FPS", "CHARTS")
+    RETURN_TYPES = ("TENSOR_1D", "FLOAT", "FLOAT", "IMAGE")
+    RETURN_NAMES = ("FEAT_MODS", "FPS", "HOP_SECONDS", "CHARTS")
     FUNCTION = "process"
     CATEGORY = "MBMnodes/Audio"
 
@@ -70,7 +70,9 @@ class AudioFeatureCalculator:
 
         # Calculate the duration of the audio
         duration = librosa.get_duration(y=y, sr=sr, hop_length=hop_length)
-        # hopSeconds = hop_length / sr
+
+        # Calculate the duration of a single hop
+        hopSeconds: float = (hop_length / sr)
 
         # Calculate tempo
         onset = librosa.onset.onset_strength(y=y, sr=sr)
@@ -151,6 +153,7 @@ class AudioFeatureCalculator:
         return (
             featModifiers,
             fps,
+            hopSeconds,
             chartImages
         )
     
