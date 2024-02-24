@@ -1,8 +1,11 @@
 # MBM's Music Visualizer: MBM Prompt, Sequence Data
 # Data class for representing data relevant for advanced prompt sequences to include in an `MbmPrompt` object's `data` dictionary.
 
+# Imports
+from .mbmPrompt import MbmPrompt
+
 # Classes
-class MbmPromptSequenceData:
+class PromptSequenceData:
     """
     Data class for representing data relevant for advanced prompt sequences to include in an `MbmPrompt` object's `data` dictionary.
     """
@@ -20,4 +23,24 @@ class MbmPromptSequenceData:
 
     # Python Functions
     def __repr__(self) -> str:
-        return f"MbmPromptSequenceData({', '.join(self.__dict__)})"
+        return f"PromptSequenceData({', '.join(self.__dict__)})"
+
+    # Static Functions
+    @staticmethod
+    def promptHasSequenceData(prompt: MbmPrompt) -> bool:
+        """
+        Returns if the given prompt has sequence data.
+        """
+        return (PromptSequenceData.DATA_KEY in prompt.data)
+    
+    @staticmethod
+    def getDataFromPrompt(prompt: MbmPrompt) -> 'PromptSequenceData':
+        """
+        Returns the sequence data from the given prompt if present.
+        Throws a `ValueError` if the data is not present.
+        """
+        # Get the data or fail
+        if PromptSequenceData.promptHasSequenceData(prompt):
+            return prompt.data[PromptSequenceData.DATA_KEY]
+        else:
+            raise ValueError(f"The given prompt does not have Sequence Data attached to it. Issue prompt: {prompt}")
