@@ -4,7 +4,7 @@
 # Imports
 import torch
 
-from .mbmPromptSequence import MbmPrompt
+from .mbmPrompt import MbmPrompt
 
 # Classes
 class InterpPromptSequence:

@@ -4,7 +4,7 @@
 from .mbmAudioFeatureCalculator import AudioFeatureCalculator
 from .mbmAudioLoader import AudioLoader
 from .mbmPromptSequenceRenderer import PromptSequenceRenderer
-from .mbmPromptSequence import PromptSequenceBuilder
+from .mbmPromptSequenceBuilder import PromptSequenceBuilder
 from .mbmPromptSequenceInterpolator import PromptSequenceInterpolator
 from .mbmImageConcat import ImageConcatenator
 
