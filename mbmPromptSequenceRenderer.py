@@ -126,7 +126,7 @@ class PromptSequenceRenderer:
         outputTensor: torch.Tensor = None
         latentTensorMeans = np.zeros(desiredFrames)
         latentTensor = latent_image["samples"].clone()
-        for i in (pbar := tqdm(range(desiredFrames), desc="Music Visualization")):
+        for i in (pbar := tqdm(range(desiredFrames), desc="Rendering Sequence")):
             # Calculate the latent tensor
             latentTensor = self._iterateLatentByMode(
                 latentTensor,
