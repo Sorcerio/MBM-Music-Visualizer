@@ -4,12 +4,14 @@
 # Imports
 import torch
 import math
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from typing import Optional
 
 from .mbmPrompt import MbmPrompt
 from .mbmPromptSequenceData import PromptSequenceData
 from .mbmInterpPromptSequence import InterpPromptSequence
-from .mbmMVShared import chartData
+from .mbmMVShared import chartData, renderChart, normalizeArray
 
 # Classes
 class PromptSequenceInterpolator:
@@ -53,6 +55,9 @@ class PromptSequenceInterpolator:
         if (split_mode == self.INTERP_OP_TIMECODE) and (feat_seconds <= 0):
             raise ValueError(f"The feature item duration (in seconds; the amount of time each item in the `feat_mods` represents) must be provided when using `{self.INTERP_OP_TIMECODE}` mode.")
 
+        # Prepare the prompt distribution chart
+        promptChart = self._startPromptChart()
+
         # Get the lengths
         promptCount = len(prompts)
         desiredFrames = len(feat_mods)
@@ -62,6 +67,7 @@ class PromptSequenceInterpolator:
             # Calculate linear interpolation between prompts
             interpPromptSeq: Optional[InterpPromptSequence] = None
             relDesiredFrames = math.ceil(desiredFrames / (promptCount - 1))
+            interPromptStartIndex = 0
             for i in range(promptCount - 1):
                 # Get the relevant prompts
                 curPrompt = prompts[i]
@@ -81,8 +87,15 @@ class PromptSequenceInterpolator:
                     # Start intial prompt sequence
                     interpPromptSeq = InterpPromptSequence(curPrompt, nextPrompt, curModifiers)
                 else:
+                    # Iterate the iter index
+                    interPromptStartIndex = len(interpPromptSeq.positives)
+
                     # Expand prompt sequence
                     interpPromptSeq.addToSequence(curPrompt, nextPrompt, curModifiers)
+
+                # Add the prompt identifier line
+                promptChart[1].axvline(x=interPromptStartIndex, linestyle="--", color=next(promptChart[1]._get_lines.prop_cycler)["color"], label=f"Prompt {i + 1}")
+                promptChart[1].text(interPromptStartIndex, 0.5, f"Prompt {i + 1}", rotation=90, verticalalignment="center")
 
             # Trim off any extra frames produced from ceil to int
             interpPromptSeq.trimToLength(desiredFrames)
@@ -96,10 +109,15 @@ class PromptSequenceInterpolator:
             # No prompts my guy
             raise ValueError("At least one prompt is required.")
 
+        # Plot the prompt distribution
+        promptChart[1].plot(list(range(len(promptSeq))), normalizeArray([torch.mean(pt.positive) for pt in promptSeq]), label="Positive")
+        promptChart[1].plot(list(range(len(promptSeq))), normalizeArray([torch.mean(pt.negative) for pt in promptSeq]), label="Negative")
+
         # Render the charts
         chartImages = torch.vstack([
             chartData([torch.mean(pt.positive) for pt in promptSeq], "Positive Prompt"),
-            chartData([torch.mean(pt.negative) for pt in promptSeq], "Negative Prompt")
+            chartData([torch.mean(pt.negative) for pt in promptSeq], "Negative Prompt"),
+            self._renderPromptChart(promptChart)
         ])
 
         return (
@@ -107,6 +125,7 @@ class PromptSequenceInterpolator:
             chartImages
         )
 
+    # Private Functions
     def _selectFeaturesWithTimecode(self,
             featMods: torch.Tensor,
             featSeconds: float,
@@ -129,3 +148,27 @@ class PromptSequenceInterpolator:
 
         # Calculate the features
         return featMods[int(startTimecode / featSeconds):int(endTimecode / featSeconds)]
+
+    def _startPromptChart(self) -> tuple[plt.Figure, plt.Axes]:
+        """
+        Handles initial creation of the prompt distribution chart.
+        """
+        # Build the chart
+        fig, ax = plt.subplots(figsize=(20, 4))
+        ax.grid(True)
+        ax.set_prop_cycle(color=list(mcolors.XKCD_COLORS.values()))
+
+        return (fig, ax)
+
+    def _renderPromptChart(self, chart: tuple[plt.Figure, plt.Axes]) -> torch.Tensor:
+        """
+        Renders the prompt distribution chart.
+        """
+        # Add labels
+        chart[1].set_title("Normalized Prompt Distribution")
+        chart[1].set_xlabel("Frame Number")
+        chart[1].set_ylabel("Prompt Mean (Normalized)")
+        chart[1].legend()
+
+        # Render the chart
+        return renderChart(chart[0])
