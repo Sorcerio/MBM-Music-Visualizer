@@ -25,13 +25,17 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 ### Nodes
 
 * `Audio Loader`: For loading an audio file using the [librosa](https://librosa.org) library.
-* `Prompt Sequence Builder`: For stacking multiple prompts into a Prompt Sequence (`PROMPT_SEQ`).
-* `Music Visualizer`: For rendering multiple images based on `AUDIO` input and other parameters.
+* `Audio Feature Calculator`: For calculating the audio feature modifiers for each step in the given audio.
+* `Prompt Sequence Builder`: For stacking multiple ComfyUI prompts into a Prompt Sequence.
+* `Prompt Sequence Interpolator`: For calculating additional sub-prompts within each set of prompts in Prompt Sequence to create a weighted interpolation transition between each.
+* `Prompt Sequence Renderer`: For rendering a sequence of images with a variety of parameters from a Prompt Sequence.
+* `Image Concatenator` For combining multiple images into a single Tensor. Images are _not_ visually combined and are still distinct.
 
 ### Types
 
-* `AUDIO`: For representing loaded audio files.
-* `PROMPT_SEQ`: For representing multiple prompts (positive and negative) in an ordered sequence.
+* `AUDIO` (`tuple[ndarray, float]`): For representing loaded audio files.
+* `TENSOR_1D` (`Tensor`): For representing a 1D Tensor of data.
+* `PROMPT_SEQ` (`list[MbmPrompt]`): For representing multiple prompts (positive and negative) in an ordered sequence.
 
 ## Install
 
@@ -44,6 +48,8 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 Nodes will be found in the `MBMnodes/` submenu inside ComfyUI.
 
 ## Usage
+
+TODO: Update image with new flow.
 
 ![Example Music Visualizer Flow](./assets/ExampleMusicVisualizer.png "Example Music Visualizer Flow")
 > 📝 **Note:** Drag the above image (or [the example workflow file](./assets/ExampleMusicVisualizer.json)) into ComfyUI to automatically load this flow!
