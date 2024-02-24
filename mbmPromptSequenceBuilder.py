@@ -6,6 +6,7 @@ import torch
 from typing import Union
 
 from .mbmPrompt import MbmPrompt
+from .mbmPromptSequenceData import PromptSequenceData
 
 # Classes
 class PromptSequenceBuilder:
@@ -62,3 +63,43 @@ class PromptSequenceBuilder:
             promptsOut = (prompts + promptsOut)
 
         return (promptsOut, )
+
+class PromptSequenceBuilderAdvanced(PromptSequenceBuilder):
+    """
+    Allows for building prompts with additional information required for more fine control of prompt sequences.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        inputTypes = super().INPUT_TYPES()
+
+        inputTypes["required"]["timecode_1"] = ("FLOAT", {"default": -1.0, "min": -1.0, "max": 0xffffffffffffffff})
+        inputTypes["optional"]["timecode_2"] = ("FLOAT", {"default": -1.0, "min": -1.0, "max": 0xffffffffffffffff})
+
+        return inputTypes
+
+    def process(self,
+            positive_1: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]],
+            negative_1: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]],
+            timecode_1: float,
+            positive_2: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]] = None,
+            negative_2: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]] = None,
+            timecode_2: float = 0.0,
+            prompts: list[MbmPrompt] = None
+        ):
+        """
+        Returns a list of MbmPrompt objects representing the prompt sequence.
+        """
+        # Validation
+        if (timecode_1 < 0) or (timecode_2 < 0):
+            raise ValueError("Timecodes must be >= 0.0.")
+
+        # Run the super
+        promptsOut = super().process(positive_1, negative_1, positive_2, negative_2, prompts)
+
+        # Add the sequence data
+        promptsOut[0][-1].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_1)
+
+        if (positive_2 is not None):
+            promptsOut[0][-2].data[PromptSequenceData.DATA_KEY] = PromptSequenceData(timecode_2)
+
+        return promptsOut

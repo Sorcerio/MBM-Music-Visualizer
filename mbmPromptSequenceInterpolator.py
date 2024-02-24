@@ -70,7 +70,8 @@ class PromptSequenceInterpolator:
                 # Decide on modifiers calculation
                 if split_mode == self.INTERP_OP_TIMECODE:
                     # Calculate based on timecode
-                    curModifiers = self._selectFeaturesWithTimecode(feat_mods, curPrompt, nextPrompt, feat_seconds)
+                    # TODO: check for last prompt (it should go to the end)
+                    curModifiers = self._selectFeaturesWithTimecode(feat_mods, feat_seconds, curPrompt, nextPrompt)
                 else: # INTERP_OP_EVEN
                     # Calculate modifiers for this section with even distribution
                     curModifiers = feat_mods[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]

@@ -4,7 +4,7 @@
 from .mbmAudioFeatureCalculator import AudioFeatureCalculator
 from .mbmAudioLoader import AudioLoader
 from .mbmPromptSequenceRenderer import PromptSequenceRenderer
-from .mbmPromptSequenceBuilder import PromptSequenceBuilder
+from .mbmPromptSequenceBuilder import PromptSequenceBuilder, PromptSequenceBuilderAdvanced
 from .mbmPromptSequenceInterpolator import PromptSequenceInterpolator
 from .mbmImageConcat import ImageConcatenator
 
@@ -16,6 +16,7 @@ NODE_CLASS_MAPPINGS = {
     "mbmAudioLoader": AudioLoader,
     "mbmPromptSequenceRenderer": PromptSequenceRenderer,
     "mbmPromptSequenceBuilder": PromptSequenceBuilder,
+    "mbmPromptSequenceBuilderAdv": PromptSequenceBuilderAdvanced,
     "mbmPromptSequenceInterpolator": PromptSequenceInterpolator,
     "mbmImageConcat": ImageConcatenator
 }
@@ -27,6 +28,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "mbmAudioLoader": "Audio Loader",
     "mbmPromptSequenceRenderer": "Prompt Sequence Renderer",
     "mbmPromptSequenceBuilder": "Prompt Sequence Builder",
+    "mbmPromptSequenceBuilderAdv": "Prompt Sequence Builder (Advanced)",
     "mbmPromptSequenceInterpolator": "Prompt Sequence Interpolator",
     "mbmImageConcat": "Image Concatenator"
 }
