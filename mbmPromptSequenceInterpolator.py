@@ -76,8 +76,20 @@ class PromptSequenceInterpolator:
                 # Decide on modifiers calculation
                 if split_mode == self.INTERP_OP_TIMECODE:
                     # Calculate based on timecode
-                    # TODO: check for last prompt (it should go to the end)
-                    curModifiers = self._selectFeaturesWithTimecode(feat_mods, feat_seconds, curPrompt, nextPrompt)
+                    # Get the timecodes
+                    startTimecode = PromptSequenceData.getDataFromPrompt(curPrompt).timecode
+                    endTimecode = PromptSequenceData.getDataFromPrompt(nextPrompt).timecode
+
+                    # Check for first and final prompt
+                    if i == 0:
+                        # First prompt. Start at 0
+                        startTimecode = 0
+                    elif i == (promptCount - 2):
+                        # Last prompt. Go to the end
+                        endTimecode = (desiredFrames * feat_seconds)
+
+                    # Calculate modifiers
+                    curModifiers = self._selectFeaturesWithTimecode(feat_mods, feat_seconds, startTimecode, endTimecode)
                 else: # INTERP_OP_EVEN
                     # Calculate modifiers for this section with even distribution
                     curModifiers = feat_mods[(relDesiredFrames * i):(relDesiredFrames * (i + 1))]
@@ -130,25 +142,21 @@ class PromptSequenceInterpolator:
     def _selectFeaturesWithTimecode(self,
             featMods: torch.Tensor,
             featSeconds: float,
-            curPrompt: MbmPrompt,
-            nextPrompt: MbmPrompt,
+            startTimecode: float,
+            endTimecode: float,
         ) -> torch.Tensor:
         """
         Selects the proper features based on the timecode of the current and next prompts.
 
         featMods: The feature modifiers tensor.
         featSeconds: The number of seconds each item in the `featMods` represents.
-        curPrompt: The current prompt.
-        nextPrompt: The next prompt.
+        startTimecode: The timecode of the current prompt.
+        endTimecode: The timecode of the next prompt.
 
         Returns a trimmed Tensor based on the `featMods` and the timecodes of the prompts.
         """
-        # Get the timecodes
-        startTimecode = PromptSequenceData.getDataFromPrompt(curPrompt).timecode
-        endTimecode = PromptSequenceData.getDataFromPrompt(nextPrompt).timecode
-
         # Calculate the features
-        return featMods[int(startTimecode / featSeconds):int(endTimecode / featSeconds)]
+        return featMods[math.floor(startTimecode / featSeconds):math.ceil(endTimecode / featSeconds)]
 
     def _startPromptChart(self) -> tuple[plt.Figure, plt.Axes]:
         """
