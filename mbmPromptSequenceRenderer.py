@@ -112,6 +112,9 @@ class PromptSequenceRenderer:
             raise ValueError("At least one prompt is required.")
 
         ## Generation
+        # Reset the bounce direction
+        self.__isBouncingUp = True
+
         # Set the initial prompt
         promptPos = prompts[0].positivePrompt()
         promptNeg = prompts[0].negativePrompt()
