@@ -94,8 +94,8 @@ class PromptSequenceInterpolator:
                     interpPromptSeq.addToSequence(curPrompt, nextPrompt, curModifiers)
 
                 # Add the prompt identifier line
-                promptChart[1].axvline(x=interPromptStartIndex, linestyle="--", color=next(promptChart[1]._get_lines.prop_cycler)["color"], label=f"Prompt {i + 1}")
-                promptChart[1].text(interPromptStartIndex, 0.5, f"Prompt {i + 1}", rotation=90, verticalalignment="center")
+                promptChart[1].axvline(x=interPromptStartIndex, linestyle="dashed", color="red")
+                promptChart[1].text(interPromptStartIndex + 0.3, 0.5, f"Prompt {i + 1} ({len(curModifiers)})", rotation=90, verticalalignment="center")
 
             # Trim off any extra frames produced from ceil to int
             interpPromptSeq.trimToLength(desiredFrames)
@@ -112,6 +112,7 @@ class PromptSequenceInterpolator:
         # Plot the prompt distribution
         promptChart[1].plot(list(range(len(promptSeq))), normalizeArray([torch.mean(pt.positive) for pt in promptSeq]), label="Positive")
         promptChart[1].plot(list(range(len(promptSeq))), normalizeArray([torch.mean(pt.negative) for pt in promptSeq]), label="Negative")
+        promptChart[1].plot(list(range(len(promptSeq))), normalizeArray(feat_mods), label="Feature Modifiers", linestyle="dotted")
 
         # Render the charts
         chartImages = torch.vstack([
@@ -156,7 +157,7 @@ class PromptSequenceInterpolator:
         # Build the chart
         fig, ax = plt.subplots(figsize=(20, 4))
         ax.grid(True)
-        ax.set_prop_cycle(color=list(mcolors.XKCD_COLORS.values()))
+        ax.set_prop_cycle(color=list(mcolors.TABLEAU_COLORS.values()))
 
         return (fig, ax)
 
