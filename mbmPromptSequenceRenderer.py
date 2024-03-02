@@ -2,7 +2,6 @@
 # Renders a prompt sequence into a set of images.
 
 # TODO: Feature: Add filebased input (json) for prompt sequence.
-# TODO: Feature: Add ability to specify specific timecodes for prompts.
 # TODO: Feature: Add ability to use a hash (?) of a latent (image?) to generate a dummy (random?) audio input.
 # TODO: Feature: Add camera effects similar to Scene Weaver.
 # TODO: Feature: Add ability to drag in audio files to the loader.
