@@ -106,8 +106,12 @@ class PromptSequenceInterpolator:
                     interpPromptSeq.addToSequence(curPrompt, nextPrompt, curModifiers)
 
                 # Add the prompt identifier line
-                promptChart[1].axvline(x=interPromptStartIndex, linestyle="dashed", color="red")
-                promptChart[1].text(interPromptStartIndex + 0.3, 0.5, f"Prompt {i + 1} ({len(curModifiers)})", rotation=90, verticalalignment="center")
+                self._addPromptIndicator(promptChart, i, (interPromptStartIndex - 1), len(curModifiers))
+
+                if i == (promptCount - 2):
+                    # Mark the final prompt
+                    posPromptCount = len(interpPromptSeq.positives)
+                    self._addPromptIndicator(promptChart, (i + 1), (posPromptCount - interPromptStartIndex), posPromptCount)
 
             # Trim off any extra frames produced from ceil to int
             interpPromptSeq.trimToLength(desiredFrames)
@@ -168,6 +172,18 @@ class PromptSequenceInterpolator:
         ax.set_prop_cycle(color=list(mcolors.TABLEAU_COLORS.values()))
 
         return (fig, ax)
+
+    def _addPromptIndicator(self, chart: tuple[plt.Figure, plt.Axes], index: int, frameNum: int, toFrameNum: int):
+        """
+        Adds a prompt indicator to the given chart.
+
+        chart: The chart to add the indicator to.
+        index: The index of the prompt.
+        frameNum: The frame number to add the indicator at.
+        toFrameNum: The frame number the prompt is replaced by the next prompt.
+        """
+        chart[1].axvline(x=frameNum, linestyle="dashed", color="red")
+        chart[1].text(frameNum + 0.3, 0.5, f"Prompt {index + 1} ({toFrameNum})", rotation=90, verticalalignment="center")
 
     def _renderPromptChart(self, chart: tuple[plt.Figure, plt.Axes]) -> torch.Tensor:
         """
