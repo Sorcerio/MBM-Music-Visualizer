@@ -41,7 +41,7 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 ## Install
 
 1. Enter ComfyUI's Python Environment by running `.\.venv\Scripts\activate` from ComfyUI's root directory.
-2. Clone this repo into ComfyUI's `custom_nodes` directory by entering the directory and running: `git clone <LINK_TBD> MBM_MusicVisualizer`.
+2. Clone this repo into ComfyUI's `custom_nodes` directory by entering the directory and running: `git clone git@github.com:Sorcerio/MBM-Music-Visualizer.git MBM_MusicVisualizer`.
 3. Enter the `MBM_MusicVisualizer` directory.
 4. Run `pip install -r .\requirements.txt` to install this project's dependencies.
 5. Start ComfyUI as normal.
