@@ -49,8 +49,6 @@ Nodes will be found in the `MBMnodes/` submenu inside ComfyUI.
 
 ## Usage
 
-TODO: Update image with new flow.
-
 ![Example Music Visualizer Flow](./assets/ExampleMusicVisualizer.png "Example Music Visualizer Flow")
 > 📝 **Note:** Drag the above image (or [the example workflow file](./assets/ExampleMusicVisualizer.json)) into ComfyUI to automatically load this flow!
 

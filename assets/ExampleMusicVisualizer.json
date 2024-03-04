@@ -1,73 +1,268 @@
 {
-  "last_node_id": 57,
-  "last_link_id": 169,
+  "last_node_id": 71,
+  "last_link_id": 201,
   "nodes": [
     {
-      "id": 3,
-      "type": "CheckpointLoaderSimple",
+      "id": 56,
+      "type": "SaveImage",
       "pos": [
-        23,
-        58
+        3537.7181725781256,
+        583.6509803828128
+      ],
+      "size": [
+        315,
+        270.00002098083496
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 193
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "musicViz_charts"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "EmptyLatentImage",
+      "pos": [
+        24,
+        199
       ],
       "size": {
         "0": 315,
-        "1": 98
+        "1": 106
       },
       "flags": {},
       "order": 0,
       "mode": 0,
       "outputs": [
         {
-          "name": "MODEL",
-          "type": "MODEL",
+          "name": "LATENT",
+          "type": "LATENT",
           "links": [
-            164
+            179
           ],
           "shape": 3,
           "slot_index": 0
-        },
-        {
-          "name": "CLIP",
-          "type": "CLIP",
-          "links": [
-            4,
-            6,
-            149,
-            154
-          ],
-          "shape": 3,
-          "slot_index": 1
-        },
-        {
-          "name": "VAE",
-          "type": "VAE",
-          "links": [
-            167
-          ],
-          "shape": 3,
-          "slot_index": 2
         }
       ],
       "properties": {
-        "Node name for S&R": "CheckpointLoaderSimple"
+        "Node name for S&R": "EmptyLatentImage"
       },
       "widgets_values": [
-        "v1-5-pruned-emaonly.ckpt"
+        512,
+        512,
+        1
+      ]
+    },
+    {
+      "id": 18,
+      "type": "VAEDecode",
+      "pos": [
+        3426.4920821718742,
+        15.48101729199216
+      ],
+      "size": {
+        "0": 210,
+        "1": 46
+      },
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 170,
+          "slot_index": 0
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 201
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            79,
+            156,
+            169
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 20,
+      "type": "PreviewImage",
+      "pos": [
+        4026.4920821718692,
+        -97.51898270800783
+      ],
+      "size": {
+        "0": 533.845947265625,
+        "1": 534.5892333984375
+      },
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 156
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [
+        473,
+        48
+      ],
+      "size": {
+        "0": 400,
+        "1": 200
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            145
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "title": "Positive Prompt 1",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "a black lab dog driving a cigar racer boat, happy, studio lighting"
+      ]
+    },
+    {
+      "id": 48,
+      "type": "CLIPTextEncode",
+      "pos": [
+        476,
+        566
+      ],
+      "size": {
+        "0": 400,
+        "1": 200
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 149
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            147
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "title": "Positive Prompt 2",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "a tuxedo cat smoking a pipe, sitting on a chair, happy, studio lighting"
+      ]
+    },
+    {
+      "id": 50,
+      "type": "CLIPTextEncode",
+      "pos": [
+        474,
+        822
+      ],
+      "size": {
+        "0": 400,
+        "1": 200
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 154
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            153
+          ],
+          "shape": 3
+        }
+      ],
+      "title": "Positive Prompt 3",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "a crocodile wearing a top hat and monocle, lounging on a recliner, happy, studio lighting"
       ]
     },
     {
       "id": 47,
       "type": "mbmPromptSequenceBuilder",
       "pos": [
-        1010,
-        323
+        1032,
+        273
       ],
       "size": {
         "0": 229.20001220703125,
         "1": 106
       },
       "flags": {},
-      "order": 7,
+      "order": 11,
       "mode": 0,
       "inputs": [
         {
@@ -112,6 +307,44 @@
       }
     },
     {
+      "id": 12,
+      "type": "mbmAudioLoader",
+      "pos": [
+        1581.5515986328137,
+        -51.49861309814451
+      ],
+      "size": {
+        "0": 315,
+        "1": 78
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            177
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "FILENAME",
+          "type": "STRING",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "mbmAudioLoader"
+      },
+      "widgets_values": [
+        "beethoven.mp3"
+      ]
+    },
+    {
       "id": 49,
       "type": "mbmPromptSequenceBuilder",
       "pos": [
@@ -123,7 +356,7 @@
         "1": 106
       },
       "flags": {},
-      "order": 8,
+      "order": 13,
       "mode": 0,
       "inputs": [
         {
@@ -158,7 +391,7 @@
           "name": "PROMPTS",
           "type": "PROMPT_SEQ",
           "links": [
-            150
+            186
           ],
           "shape": 3,
           "slot_index": 0
@@ -169,111 +402,277 @@
       }
     },
     {
-      "id": 54,
-      "type": "PreviewImage",
+      "id": 64,
+      "type": "mbmPromptSequenceInterpolator",
       "pos": [
-        2973.7005859374995,
-        483.06005981445315
+        2299.2753906249977,
+        183.6527095336913
       ],
       "size": [
-        535.3042855468743,
-        533.3466418457028
+        315,
+        102
       ],
       "flags": {},
-      "order": 11,
+      "order": 14,
       "mode": 0,
       "inputs": [
         {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 159
+          "name": "prompts",
+          "type": "PROMPT_SEQ",
+          "link": 186
+        },
+        {
+          "name": "feat_mods",
+          "type": "TENSOR_1D",
+          "link": 181
+        },
+        {
+          "name": "feat_seconds",
+          "type": "FLOAT",
+          "link": 191,
+          "widget": {
+            "name": "feat_seconds"
+          },
+          "slot_index": 2
         }
       ],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      }
-    },
-    {
-      "id": 56,
-      "type": "SaveImage",
-      "pos": [
-        2622.7005859374995,
-        489.06005981445315
-      ],
-      "size": {
-        "0": 315,
-        "1": 58
-      },
-      "flags": {},
-      "order": 12,
-      "mode": 0,
-      "inputs": [
+      "outputs": [
         {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 168
-        }
-      ],
-      "properties": {},
-      "widgets_values": [
-        "musicViz_charts"
-      ]
-    },
-    {
-      "id": 22,
-      "type": "SaveAnimatedWEBP",
-      "pos": [
-        3548,
-        -150
-      ],
-      "size": {
-        "0": 315,
-        "1": 366
-      },
-      "flags": {},
-      "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 79,
+          "name": "PROMPTS",
+          "type": "PROMPT_SEQ",
+          "links": [
+            185
+          ],
+          "shape": 3,
           "slot_index": 0
         },
         {
-          "name": "fps",
-          "type": "FLOAT",
-          "link": 165,
-          "widget": {
-            "name": "fps"
-          },
+          "name": "CHARTS",
+          "type": "IMAGE",
+          "links": [
+            189
+          ],
+          "shape": 3,
           "slot_index": 1
         }
       ],
       "properties": {
-        "Node name for S&R": "SaveAnimatedWEBP"
+        "Node name for S&R": "mbmPromptSequenceInterpolator"
       },
       "widgets_values": [
-        "__test",
-        6,
-        true,
-        80,
-        "default"
+        "split_evenly",
+        -1
+      ]
+    },
+    {
+      "id": 66,
+      "type": "mbmImageConcat",
+      "pos": [
+        2629.2753906249977,
+        456.6527095336915
+      ],
+      "size": {
+        "0": 210,
+        "1": 46
+      },
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 189
+        },
+        {
+          "name": "image_2",
+          "type": "IMAGE",
+          "link": 190
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGES",
+          "type": "IMAGE",
+          "links": [
+            187
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "mbmImageConcat"
+      }
+    },
+    {
+      "id": 60,
+      "type": "mbmImageConcat",
+      "pos": [
+        3025.2753906249977,
+        455.6527095336915
+      ],
+      "size": {
+        "0": 210,
+        "1": 46
+      },
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_1",
+          "type": "IMAGE",
+          "link": 187
+        },
+        {
+          "name": "image_2",
+          "type": "IMAGE",
+          "link": 171
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGES",
+          "type": "IMAGE",
+          "links": [
+            192
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "mbmImageConcat"
+      }
+    },
+    {
+      "id": 67,
+      "type": "Reroute",
+      "pos": [
+        3379,
+        610
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 192
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "IMAGE",
+          "links": [
+            193,
+            194
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 59,
+      "type": "mbmPromptSequenceRenderer",
+      "pos": [
+        2655.2753906249977,
+        41.652709533691386
+      ],
+      "size": {
+        "0": 315,
+        "1": 358
+      },
+      "flags": {
+        "collapsed": false
+      },
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompts",
+          "type": "PROMPT_SEQ",
+          "link": 185,
+          "slot_index": 0
+        },
+        {
+          "name": "latent_mods",
+          "type": "TENSOR_1D",
+          "link": 195,
+          "slot_index": 1
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 179
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 200
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENTS",
+          "type": "LATENT",
+          "links": [
+            170
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "CHARTS",
+          "type": "IMAGE",
+          "links": [
+            171
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "mbmPromptSequenceRenderer"
+      },
+      "widgets_values": [
+        240170672752253,
+        "randomize",
+        "fixed",
+        "bounce",
+        -1,
+        5,
+        20,
+        8,
+        "euler",
+        "normal",
+        1
       ]
     },
     {
       "id": 57,
       "type": "SaveImage",
       "pos": [
-        2659,
-        -156
+        3701,
+        -92
       ],
-      "size": {
-        "0": 315,
-        "1": 58
-      },
+      "size": [
+        315,
+        270
+      ],
       "flags": {},
-      "order": 15,
+      "order": 21,
       "mode": 0,
       "inputs": [
         {
@@ -288,37 +687,339 @@
       ]
     },
     {
-      "id": 6,
-      "type": "EmptyLatentImage",
+      "id": 22,
+      "type": "SaveAnimatedWEBP",
       "pos": [
-        24,
-        199
+        3697,
+        63
       ],
       "size": {
         "0": 315,
-        "1": 106
+        "1": 366
       },
       "flags": {},
-      "order": 1,
+      "order": 19,
       "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 79,
+          "slot_index": 0
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "link": 178,
+          "widget": {
+            "name": "fps"
+          },
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAnimatedWEBP"
+      },
+      "widgets_values": [
+        "musicViz_anim",
+        6,
+        true,
+        80,
+        "default",
+        null
+      ]
+    },
+    {
+      "id": 69,
+      "type": "Reroute",
+      "pos": [
+        501,
+        -252
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 197
+        }
+      ],
       "outputs": [
         {
-          "name": "LATENT",
-          "type": "LATENT",
+          "name": "",
+          "type": "VAE",
           "links": [
-            163
+            199
           ],
-          "shape": 3,
           "slot_index": 0
         }
       ],
       "properties": {
-        "Node name for S&R": "EmptyLatentImage"
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 68,
+      "type": "Reroute",
+      "pos": [
+        503,
+        -213
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 196
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "MODEL",
+          "links": [
+            198
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 70,
+      "type": "Reroute",
+      "pos": [
+        2352,
+        -214
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 198
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "MODEL",
+          "links": [
+            200
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 71,
+      "type": "Reroute",
+      "pos": [
+        3126,
+        -240
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 199
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "VAE",
+          "links": [
+            201
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 54,
+      "type": "PreviewImage",
+      "pos": [
+        3889,
+        578
+      ],
+      "size": {
+        "0": 535.3042602539062,
+        "1": 533.3466186523438
+      },
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 194
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 63,
+      "type": "mbmAudioFeatureCalculator",
+      "pos": [
+        1936.2753906250011,
+        -33.34729046630869
+      ],
+      "size": {
+        "0": 315,
+        "1": 238
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 177
+        }
+      ],
+      "outputs": [
+        {
+          "name": "FEAT_MODS",
+          "type": "TENSOR_1D",
+          "links": [
+            181,
+            195
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "FEAT_SECONDS",
+          "type": "FLOAT",
+          "links": [
+            191
+          ],
+          "shape": 3
+        },
+        {
+          "name": "FPS",
+          "type": "FLOAT",
+          "links": [
+            178
+          ],
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "CHARTS",
+          "type": "IMAGE",
+          "links": [
+            190
+          ],
+          "shape": 3,
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "mbmAudioFeatureCalculator"
       },
       "widgets_values": [
+        1,
         512,
-        512,
-        1
+        6,
+        10000,
+        -10000,
+        false
+      ]
+    },
+    {
+      "id": 3,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        23,
+        58
+      ],
+      "size": {
+        "0": 315,
+        "1": 98
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            196
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            4,
+            6,
+            149,
+            154
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            197
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "v1-5-pruned-emaonly.ckpt"
       ]
     },
     {
@@ -333,7 +1034,7 @@
         "1": 200
       },
       "flags": {},
-      "order": 4,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -362,319 +1063,6 @@
       "widgets_values": [
         "people"
       ]
-    },
-    {
-      "id": 4,
-      "type": "CLIPTextEncode",
-      "pos": [
-        473,
-        48
-      ],
-      "size": {
-        "0": 400,
-        "1": 200
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 4
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            145
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "title": "Positive Prompt 1",
-      "properties": {
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        "a black lab dog driving a cigar racer boat, happy, studio lighting"
-      ]
-    },
-    {
-      "id": 48,
-      "type": "CLIPTextEncode",
-      "pos": [
-        476,
-        566
-      ],
-      "size": {
-        "0": 400,
-        "1": 200
-      },
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 149
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            147
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "title": "Positive Prompt 2",
-      "properties": {
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        "a tuxedo cat smoking a pipe, sitting on a chair, happy, studio lighting"
-      ]
-    },
-    {
-      "id": 50,
-      "type": "CLIPTextEncode",
-      "pos": [
-        474,
-        822
-      ],
-      "size": {
-        "0": 400,
-        "1": 200
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 154
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            153
-          ],
-          "shape": 3
-        }
-      ],
-      "title": "Positive Prompt 3",
-      "properties": {
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        "a crocodile wearing a top hat and monocle, lounging on a recliner, happy, studio lighting"
-      ]
-    },
-    {
-      "id": 18,
-      "type": "VAEDecode",
-      "pos": [
-        2387,
-        -40
-      ],
-      "size": {
-        "0": 210,
-        "1": 46
-      },
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "samples",
-          "type": "LATENT",
-          "link": 166,
-          "slot_index": 0
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 167
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            79,
-            156,
-            169
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VAEDecode"
-      }
-    },
-    {
-      "id": 46,
-      "type": "mbmMusicVisuzalizer",
-      "pos": [
-        1920,
-        27
-      ],
-      "size": {
-        "0": 315,
-        "1": 430
-      },
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "link": 162
-        },
-        {
-          "name": "prompts",
-          "type": "PROMPT_SEQ",
-          "link": 150
-        },
-        {
-          "name": "latent_image",
-          "type": "LATENT",
-          "link": 163,
-          "slot_index": 2
-        },
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 164
-        }
-      ],
-      "outputs": [
-        {
-          "name": "LATENTS",
-          "type": "LATENT",
-          "links": [
-            166
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "FPS",
-          "type": "FLOAT",
-          "links": [
-            165
-          ],
-          "shape": 3,
-          "slot_index": 1
-        },
-        {
-          "name": "CHARTS",
-          "type": "IMAGE",
-          "links": [
-            159,
-            168
-          ],
-          "shape": 3,
-          "slot_index": 2
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "mbmMusicVisuzalizer"
-      },
-      "widgets_values": [
-        1125439063544703,
-        "fixed",
-        "fixed",
-        "bounce",
-        1,
-        512,
-        6,
-        -1,
-        7,
-        20,
-        8,
-        "euler",
-        "normal",
-        1
-      ]
-    },
-    {
-      "id": 12,
-      "type": "mbmAudioLoader",
-      "pos": [
-        1581.2762080078126,
-        -107.1513226318359
-      ],
-      "size": {
-        "0": 315,
-        "1": 78
-      },
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "AUDIO",
-          "type": "AUDIO",
-          "links": [
-            162
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "FILENAME",
-          "type": "STRING",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "mbmAudioLoader"
-      },
-      "widgets_values": [
-        "beethoven.mp3"
-      ]
-    },
-    {
-      "id": 20,
-      "type": "PreviewImage",
-      "pos": [
-        2987,
-        -153
-      ],
-      "size": {
-        "0": 533.845947265625,
-        "1": 534.5892333984375
-      },
-      "flags": {},
-      "order": 14,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 156
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      }
     }
   ],
   "links": [
@@ -743,14 +1131,6 @@
       "CLIP"
     ],
     [
-      150,
-      49,
-      0,
-      46,
-      1,
-      "PROMPT_SEQ"
-    ],
-    [
       151,
       47,
       0,
@@ -791,76 +1171,188 @@
       "IMAGE"
     ],
     [
-      159,
-      46,
-      2,
-      54,
-      0,
-      "IMAGE"
-    ],
-    [
-      162,
-      12,
-      0,
-      46,
-      0,
-      "AUDIO"
-    ],
-    [
-      163,
-      6,
-      0,
-      46,
-      2,
-      "LATENT"
-    ],
-    [
-      164,
-      3,
-      0,
-      46,
-      3,
-      "MODEL"
-    ],
-    [
-      165,
-      46,
-      1,
-      22,
-      1,
-      "FLOAT"
-    ],
-    [
-      166,
-      46,
-      0,
-      18,
-      0,
-      "LATENT"
-    ],
-    [
-      167,
-      3,
-      2,
-      18,
-      1,
-      "VAE"
-    ],
-    [
-      168,
-      46,
-      2,
-      56,
-      0,
-      "IMAGE"
-    ],
-    [
       169,
       18,
       0,
       57,
       0,
       "IMAGE"
+    ],
+    [
+      170,
+      59,
+      0,
+      18,
+      0,
+      "LATENT"
+    ],
+    [
+      171,
+      59,
+      1,
+      60,
+      1,
+      "IMAGE"
+    ],
+    [
+      177,
+      12,
+      0,
+      63,
+      0,
+      "AUDIO"
+    ],
+    [
+      178,
+      63,
+      2,
+      22,
+      1,
+      "FLOAT"
+    ],
+    [
+      179,
+      6,
+      0,
+      59,
+      2,
+      "LATENT"
+    ],
+    [
+      181,
+      63,
+      0,
+      64,
+      1,
+      "TENSOR_1D"
+    ],
+    [
+      185,
+      64,
+      0,
+      59,
+      0,
+      "PROMPT_SEQ"
+    ],
+    [
+      186,
+      49,
+      0,
+      64,
+      0,
+      "PROMPT_SEQ"
+    ],
+    [
+      187,
+      66,
+      0,
+      60,
+      0,
+      "IMAGE"
+    ],
+    [
+      189,
+      64,
+      1,
+      66,
+      0,
+      "IMAGE"
+    ],
+    [
+      190,
+      63,
+      3,
+      66,
+      1,
+      "IMAGE"
+    ],
+    [
+      191,
+      63,
+      1,
+      64,
+      2,
+      "FLOAT"
+    ],
+    [
+      192,
+      60,
+      0,
+      67,
+      0,
+      "*"
+    ],
+    [
+      193,
+      67,
+      0,
+      56,
+      0,
+      "IMAGE"
+    ],
+    [
+      194,
+      67,
+      0,
+      54,
+      0,
+      "IMAGE"
+    ],
+    [
+      195,
+      63,
+      0,
+      59,
+      1,
+      "TENSOR_1D"
+    ],
+    [
+      196,
+      3,
+      0,
+      68,
+      0,
+      "*"
+    ],
+    [
+      197,
+      3,
+      2,
+      69,
+      0,
+      "*"
+    ],
+    [
+      198,
+      68,
+      0,
+      70,
+      0,
+      "*"
+    ],
+    [
+      199,
+      69,
+      0,
+      71,
+      0,
+      "*"
+    ],
+    [
+      200,
+      70,
+      0,
+      59,
+      3,
+      "MODEL"
+    ],
+    [
+      201,
+      71,
+      0,
+      18,
+      1,
+      "VAE"
     ]
   ],
   "groups": [
@@ -889,10 +1381,10 @@
     {
       "title": "Visualization",
       "bounding": [
-        1571,
-        -181,
-        674,
-        648
+        1572,
+        -125,
+        1674,
+        638
       ],
       "color": "#8A8",
       "font_size": 24
@@ -900,9 +1392,9 @@
     {
       "title": "Content Image Output",
       "bounding": [
-        2377,
-        -230,
-        1496,
+        3416,
+        -175,
+        1154,
         622
       ],
       "color": "#a1309b",
@@ -911,8 +1403,8 @@
     {
       "title": "Statistic Charts Output",
       "bounding": [
-        2613,
-        409,
+        3527,
+        503,
         906,
         617
       ],
