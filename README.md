@@ -51,7 +51,7 @@ Nodes will be found in the `MBMnodes/` submenu inside ComfyUI.
 ## Usage
 
 ![Example Music Visualizer Flow](./assets/ExampleMusicVisualizer.png "Example Music Visualizer Flow")
-> 📝 **Note:** Drag the above image (or [the example workflow file](./assets/ExampleMusicVisualizer.json)) into ComfyUI to automatically load this flow!
+> 📝 **Note:** Drag [the example workflow file](./assets/ExampleMusicVisualizer.json) into ComfyUI to automatically load this flow!
 
 Place any audio files you would like to load in the [audio/](./audio/) directory.
 You can always refresh the webpage ComfyUI is loaded into to refresh the list in the `Audio Loader` node.
