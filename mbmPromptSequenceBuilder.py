@@ -41,7 +41,7 @@ class PromptSequenceBuilder:
             positive_2: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]] = None,
             negative_2: list[list[Union[torch.Tensor, dict[str, torch.Tensor]]]] = None,
             prompts: list[MbmPrompt] = None
-        ):
+        ) -> list[MbmPrompt]:
         """
         Returns a list of MbmPrompt objects representing the prompt sequence.
         """

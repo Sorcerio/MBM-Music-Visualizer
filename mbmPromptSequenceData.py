@@ -14,12 +14,13 @@ class PromptSequenceData:
 
     # Constructor
     def __init__(self,
-            timecode: float
+            timecode: float,
+            **kwargs
         ) -> None:
         """
         timecode: A timecode in seconds reprsenting the time when the prompt should be fully present in the sequence.
         """
-        self.timecode = timecode
+        self.timecode = float(timecode)
 
     # Python Functions
     def __repr__(self) -> str:
@@ -45,3 +46,35 @@ class PromptSequenceData:
             return prompt.data[PromptSequenceData.DATA_KEY]
         else:
             raise ValueError(f"The given prompt does not have Sequence Data attached to it. Issue prompt: {prompt}")
+
+    @staticmethod
+    def addDataToPrompt(prompt: MbmPrompt, data: 'PromptSequenceData'):
+        """
+        Adds the given data to the prompt.
+        """
+        prompt.data[PromptSequenceData.DATA_KEY] = data
+
+    @staticmethod
+    def tryToAddDataFromJson(prompt: MbmPrompt, jsonData: dict) -> bool:
+        """
+        Tries to add sequence data from the given JSON data to the prompt.
+
+        prompt: The prompt to add the data to.
+        jsonData: The JSON data to map to a `PromptSequenceData` object constructor.
+
+        Returns `True` if the operation was successful.
+        """
+        # Collapse if needed
+        if PromptSequenceData.DATA_KEY in jsonData:
+            jsonData = jsonData[PromptSequenceData.DATA_KEY]
+
+        # Try to get the data
+        try:
+            data = PromptSequenceData(**jsonData)
+        except NameError:
+            return False
+
+        # Add the data
+        PromptSequenceData.addDataToPrompt(prompt, data)
+
+        return True

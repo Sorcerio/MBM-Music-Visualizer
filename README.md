@@ -29,7 +29,8 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 * `Prompt Sequence Builder`: For stacking multiple ComfyUI prompts into a Prompt Sequence.
 * `Prompt Sequence Interpolator`: For calculating additional sub-prompts within each set of prompts in Prompt Sequence to create a weighted interpolation transition between each.
 * `Prompt Sequence Renderer`: For rendering a sequence of images with a variety of parameters from a Prompt Sequence.
-* `Image Concatenator` For combining multiple images into a single Tensor. Images are _not_ visually combined and are still distinct.
+* `Image Concatenator`: For combining multiple images into a single Tensor. Images are _not_ visually combined and are still distinct.
+* `Prompt Sequence Loader`: For loading a sequence of prompts from a JSON file like [in this example](./promptSequences/example.json).
 
 ### Types
 
@@ -63,5 +64,6 @@ The FPS can be fed into any further video or gif generating nodes.
 The Latent Images, which are the output content of the visualization, should be converted and either saved individually or compiled into a video through another node.
 The charts are pixel images that can be saved or modified as desired.
 
-_When testing your generations_, consider setting the `image_limit` to `1` or higher to generate only a specific number of images.
+_When testing your generations_, consider bypassing the `Prompt Sequence Renderer` and its outputs.
+(Alternatively, set the `image_limit` to `1` or higher to generate only a specific number of images.)
 Doing so **will still produce complete charts** for most data sources allowing you to preview the general flow of the visualization before you commit to image generation for all frames.
