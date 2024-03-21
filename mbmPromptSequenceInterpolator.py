@@ -106,12 +106,11 @@ class PromptSequenceInterpolator:
                     interpPromptSeq.addToSequence(curPrompt, nextPrompt, curModifiers)
 
                 # Add the prompt identifier line
-                self._addPromptIndicator(promptChart, i, (interPromptStartIndex - 1), len(curModifiers))
+                self._addPromptIndicator(promptChart, i, (interPromptStartIndex - 1), interPromptStartIndex)
 
                 if i == (promptCount - 2):
                     # Mark the final prompt
-                    posPromptCount = len(interpPromptSeq.positives)
-                    self._addPromptIndicator(promptChart, (i + 1), (posPromptCount - interPromptStartIndex), posPromptCount)
+                    self._addPromptIndicator(promptChart, (i + 1), desiredFrames, len(interpPromptSeq.positives))
 
             # Trim off any extra frames produced from ceil to int
             interpPromptSeq.trimToLength(desiredFrames)
@@ -183,7 +182,7 @@ class PromptSequenceInterpolator:
         toFrameNum: The frame number the prompt is replaced by the next prompt.
         """
         chart[1].axvline(x=frameNum, linestyle="dashed", color="red")
-        chart[1].text(frameNum + 0.3, 0.5, f"Prompt {index + 1} ({toFrameNum})", rotation=90, verticalalignment="center")
+        chart[1].text(frameNum + 0.5, 0.5, f"Prompt {index + 1} ({toFrameNum})", rotation=90, verticalalignment="center")
 
     def _renderPromptChart(self, chart: tuple[plt.Figure, plt.Axes]) -> torch.Tensor:
         """
