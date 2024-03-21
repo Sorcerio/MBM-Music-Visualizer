@@ -1,26 +1,18 @@
 {
-    "_v": "1.0.0",
-    "prompts": [
+    "_v": "1.1.0",
+    "defaults": {
+        "positive": "",
+        "negative": "people"
+    },
+    "sequence": [
         {
-            "positive": "a black lab dog driving a cigar racer boat, happy, studio lighting",
-            "negative": "people",
-            "sequenceData": {
-                "timecode": 0
-            }
+            "positive": "a black lab dog driving a cigar racer boat, happy, studio lighting"
         },
         {
-            "positive": "a tuxedo cat smoking a pipe, sitting on a chair, happy, studio lighting",
-            "negative": "people",
-            "sequenceData": {
-                "timecode": 3
-            }
+            "positive": "a tuxedo cat smoking a pipe, sitting on a chair, happy, studio lighting"
         },
         {
-            "positive": "a crocodile wearing a top hat and monocle, lounging on a recliner, happy, studio lighting",
-            "negative": "people",
-            "sequenceData": {
-                "timecode": 7
-            }
+            "positive": "a crocodile wearing a top hat and monocle, lounging on a recliner, happy, studio lighting"
         }
     ]
 }
