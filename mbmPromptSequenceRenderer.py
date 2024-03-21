@@ -56,6 +56,7 @@ class PromptSequenceRenderer:
     def INPUT_TYPES(s):
         return {
             "required": {
+                # Visualizer Settings
                 "prompts": ("PROMPT_SEQ", ),
                 "latent_mods": ("TENSOR_1D", ),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
@@ -65,8 +66,7 @@ class PromptSequenceRenderer:
                 "image_limit": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "latent_mod_limit": ("FLOAT", {"default": 5.0, "min": -1.0, "max": 10000.0}), # The maximum variation that can occur to the latent based on the latent's mean value. Provide `<= 0` to have no limit
 
-                # TODO: Move these into a KSamplerSettings node?
-                # Also might be worth adding a KSamplerSettings to KSamplerInputs node that splits it all out to go into the standard KSampler when done here?
+                # Generation Settings
                 "model": ("MODEL",),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
@@ -177,25 +177,6 @@ class PromptSequenceRenderer:
 
         # Render charts
         chartImages = torch.vstack([
-            # self._chartGenerationFeats( # TODO: How to do the combined chart?
-            #     {
-            #         "seed": f"{seed} ({seed_mode})",
-            #         "latent mode": latent_mode,
-            #         "latent mod limit": f"{latent_mod_limit:.2f}",
-            #         "intensity": f"{intensity:.2f}",
-            #         "feat mod max": (f"{feat_mod_max:.2f}" if (feat_mod_max is not None) else "none"),
-            #         "feat mod min": (f"{feat_mod_min:.2f}" if (feat_mod_min is not None) else "none"),
-            #         "feat mod norm": ("yes" if feat_mod_normalize else "no"),
-            #         "hop length": hop_length,
-            #         "fps target": f"{fps_target:.2f}",
-            #         "frames": desiredFrames
-            #     },
-            #     tempo,
-            #     spectroMean,
-            #     chromaMean,
-            #     featModifiers,
-            #     promptSeq.positives
-            # ),
             chartData(latentTensorMeans, "Latent Means")
         ])
 
@@ -334,45 +315,3 @@ class PromptSequenceRenderer:
         else: # SEED_MODE_FIXED
             # Seed stays the same
             return seed
-
-    # def _chartGenerationFeats(self, # TODO: Overhaul readability. Dotted except for feature modifiers?
-    #         renderParams: dict[str, str],
-    #         tempo,
-    #         spectroMean,
-    #         chromaMean,
-    #         featModifiers,
-    #         promptSeqPos
-    #     ) -> torch.Tensor:
-    #     """
-    #     Creates a chart representing the entire generation flow.
-
-    #     renderParams: The parameters used to render the chart.
-    #     tempo: The tempo feature data.
-    #     spectroMean: The spectrogram mean feature data.
-    #     chromaMean: The chroma mean feature data.
-    #     featModifiers: The calculated feature modifiers.
-    #     promptSeqPos: The positive prompt sequence.
-
-    #     Returns a ComfyUI compatible Tensor image of the chart.
-    #     """
-    #     # Build the chart
-    #     fig, ax = plt.subplots(figsize=(20, 4))
-
-    #     ax.plot(self._normalizeArray(tempo), label="Tempo")
-    #     ax.plot(self._normalizeArray(spectroMean), label="Spectro Mean")
-    #     ax.plot(self._normalizeArray(chromaMean), label="Chroma Mean")
-    #     ax.plot(self._normalizeArray(featModifiers), label="Modifiers")
-    #     ax.plot(self._normalizeArray([torch.mean(c) for c in promptSeqPos]), label="Prompt")
-
-    #     ax.legend()
-    #     ax.grid(True)
-    #     ax.set_title("Normalized Combined Data")
-    #     ax.set_xlabel("Index")
-    #     ax.set_ylabel("Value")
-
-    #     # Add the render parameters
-    #     renderParams = "\n".join([f"{str(k).strip()}: {str(v).strip()}" for k, v in renderParams.items()])
-    #     ax.text(1.02, 0.5, renderParams, transform=ax.transAxes, va="center")
-
-    #     # Render the chart
-    #     return self._renderChart(fig)

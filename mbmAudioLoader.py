@@ -22,7 +22,7 @@ class AudioLoader:
 
         return {
             "required": {
-                "filepath": (sorted(localFiles),) # TODO: add more params?
+                "filepath": (sorted(localFiles), )
             }
         }
 
