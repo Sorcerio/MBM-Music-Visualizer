@@ -35,7 +35,7 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 ### Types
 
 * `AUDIO` (`tuple[ndarray, float]`): For representing loaded audio files.
-* `TENSOR_1D` (`Tensor`): For representing a 1D Tensor of data.
+* `TENSOR_1D` (`Tensor[*]`): For representing a 1D Tensor of data.
 * `PROMPT_SEQ` (`list[MbmPrompt]`): For representing multiple prompts (positive and negative) in an ordered sequence.
 
 ## Install
@@ -59,8 +59,8 @@ You can always refresh the webpage ComfyUI is loaded into to refresh the list in
 The `Music Visualizer` node takes an `AUDIO` object in and produces a set of Latent Images on output.
 A `tqdm` progress bar will be shown in the console to display the current status of the visualization and how long it is expected to take.
 
-Upon completion of a visualization, the `Music Visualizer` will output the input FPS, a set of Latent Images that can be decoded using the built-in Latent Decoder, and a set of Images showing relevant data from the run.
-The FPS can be fed into any further video or gif generating nodes.
+Upon completion of a visualization, the `Music Visualizer` will output the input FPS, a set of Latent Images that can be decoded using the ComfyUI-native Latent Decoder, and a set of Images showing relevant data from the run.
+The FPS can be fed into any further video or GIF generating nodes.
 The Latent Images, which are the output content of the visualization, should be converted and either saved individually or compiled into a video through another node.
 The charts are pixel images that can be saved or modified as desired.
 
