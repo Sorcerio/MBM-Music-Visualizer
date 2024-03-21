@@ -32,7 +32,6 @@ An image generation based music visualizer integrated into [comfyanonymous/Comfy
 * `Prompt Sequence Renderer`: For rendering a sequence of images with a variety of parameters from a Prompt Sequence.
 * `Image Concatenator`: For combining multiple images into a single Tensor. Images are _not_ visually combined and are still distinct.
 * `Prompt Sequence Loader`: For loading a sequence of prompts from a JSON file fitting the [specifications found here](./docs/PromptSequenceJsonSpecs.md).
-* `Prompt Seqeuence Exporter`: For saving a sequence of prompts into a JSON that conforms to the [specifications found here](./docs/PromptSequenceJsonSpecs.md).
 
 ### Types
 

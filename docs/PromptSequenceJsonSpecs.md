@@ -12,7 +12,6 @@
 ```json
 {
     "_v": "1.1.0",
-    "_t": "promptSequence",
     "defaults": {
         "positive": "a pet driving a vehicle",
         "negative": "people"
@@ -37,7 +36,6 @@
 }
 ```
 * `_v`: The version of the Prompt Sequence JSON file following [Semantic Versioning 2.0.0 specifications](https://semver.org).
-* `_t`: The type of JSON file. This value will always be `promptSequence` in this case.
 * `defaults`: A set of default values to use for optional values in the `sequence`.
     * `positive`: A default positive prompt to be used if one is not provided.
     * `negative`: A default negative prompt to be used if one is not provided.
@@ -55,7 +53,7 @@ Note that if you would like a prompt to use _only_ the defaults, provide an empt
 
 A Prompt Sequence JSON file can be loaded by the `Prompt Sequence Loader` node.
 
-A Prompt Sequence can also be saved from ComfyUI by using the `Prompt Seqeuence Exporter` node.
+Prompt Sequences, once encoded, cannot currently be exported.
 
 ## Examples
 
