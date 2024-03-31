@@ -72,6 +72,10 @@ class PromptSequenceData:
         try:
             data = PromptSequenceData(**jsonData)
         except NameError:
+            # The data is not present
+            return False
+        except TypeError:
+            # No timecode supplied
             return False
 
         # Add the data

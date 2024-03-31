@@ -4,3 +4,7 @@ test/
 audio/
 !audio/AudioFilesHere.txt
 idea.md
+stable-diffusion-comfyui.code-workspace
+promptSequences/
+!promptSequences/example.json
+!promptSequences/PromptSequencesHere.txt
