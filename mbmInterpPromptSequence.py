@@ -51,57 +51,38 @@ class InterpPromptSequence:
         end: The prompt to end on.
         modifiers: The feature modifiers to use in the weighted interpolation.
         """
+        # Add each data type to the sequence
+        self.positives = self._addToSequence(self.positives, start.positive, end.positive, modifiers)
+        self.negatives = self._addToSequence(self.negatives, start.negative, end.negative, modifiers)
+        self.positivePools = self._addToSequence(self.positivePools, start.positivePool, end.positivePool, modifiers)
+        self.negativePools = self._addToSequence(self.negativePools, start.negativePool, end.negativePool, modifiers)
+
+    def _addToSequence(self, container: torch.Tensor, start: torch.Tensor, stop: torch.Tensor, modifiers: torch.Tensor) -> torch.Tensor:
+        """
+        Add an additional interpolated tensor to the sequence.
+
+        container: The tensor to add the interpolation to.
+        start: The tensor to start from.
+        stop: The tensor to end on.
+        modifiers: The feature modifiers to use in the weighted interpolation.
+
+        Returns the modified `container` tensor.
+        """
         # Calculate the interpolation
-        posInterp, posUpdate = self._weightedInterpolation(
-            start.positive,
-            end.positive,
+        interp, shapeChanged = self._weightedInterpolation(
+            start,
+            stop,
             modifiers,
-            tokenCount=self.positives.size(1)
+            tokenCount=container.size(1)
         )
-        posInterp = posInterp[1:]
-
-        negInterp, negUpdate = self._weightedInterpolation(
-            start.negative,
-            end.negative,
-            modifiers,
-            tokenCount=self.negatives.size(1)
-        )
-        negInterp = negInterp[1:]
-
-        posPoolInterp, posPoolUpdate = self._weightedInterpolation(
-            start.positivePool,
-            end.positivePool,
-            modifiers,
-            tokenCount=self.positivePools.size(1)
-        )
-        posPoolInterp = posPoolInterp[1:]
-
-        negPoolInterp, negPoolUpdate = self._weightedInterpolation(
-            start.negativePool,
-            end.negativePool,
-            modifiers,
-            tokenCount=self.negativePools.size(1)
-        )
-        negPoolInterp = negPoolInterp[1:]
+        interp = interp[1:]
 
         # Check if shape updates are needed
-        if posUpdate:
-            self.positives = self.addPromptTokens(self.positives, posInterp.shape)
+        if shapeChanged:
+            container = self.addPromptTokens(container, interp.shape)
 
-        if negUpdate:
-            self.negatives = self.addPromptTokens(self.negatives, negInterp.shape)
-
-        if negPoolUpdate:
-            self.negativePools = self.addPromptTokens(self.negativePools, negPoolInterp.shape)
-
-        if posPoolUpdate:
-            self.positivePools = self.addPromptTokens(self.positivePools, posPoolInterp.shape)
-
-        # Add the interpolation
-        self.positives = torch.vstack((self.positives, posInterp))
-        self.negatives = torch.vstack((self.negatives, negInterp))
-        self.positivePools = torch.vstack((self.positivePools, posPoolInterp))
-        self.negativePools = torch.vstack((self.negativePools, negPoolInterp))
+        # Create modified container with the interpolation
+        return torch.vstack((container, interp))
 
     def trimToLength(self, length: int) -> None:
         """
