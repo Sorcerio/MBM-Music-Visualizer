@@ -88,12 +88,8 @@ class InterpPromptSequence:
         if posUpdate:
             self.positives = self.addPromptTokens(self.positives, posInterp.shape)
 
-            print("pos reshape", self.positives.shape, posInterp.shape)
-
         if negUpdate:
             self.negatives = self.addPromptTokens(self.negatives, negInterp.shape)
-
-            print("neg reshape", self.negatives.shape, negInterp.shape)
 
         if negPoolUpdate:
             self.negativePools = self.addPromptTokens(self.negativePools, negPoolInterp.shape)
