@@ -18,8 +18,6 @@ class InterpPromptSequence:
         end: The prompt to end on.
         modifiers: The feature modifiers to use in the weighted interpolation.
         """
-        # TODO: Reduce duplicate code. Add them all to a tuple or something. Or a Tensor...
-
         # Calculate initial interpolation
         self.positives = self._weightedInterpolation(
             start.positive,
