@@ -1,13 +1,6 @@
 # MBM's Music Visualizer: Prompt Sequence Renderer
 # Renders a prompt sequence into a set of images.
 
-# TODO: Feature: Add ability to use a hash (?) of a latent (image?) to generate a dummy (random?) audio input.
-# TODO: Feature: Add camera effects similar to Scene Weaver.
-# TODO: Feature: Add ability to drag in audio and prompt sequence files to the loader.
-
-# TODO: Test: Optimize by using previous image for N number of frames if the delta is small enough. ("Delta Cull Threshold")
-#   ie: You render more frames for areas of high change and less for areas of low change, but retain the same overall FPS/etc.
-
 # Imports
 import torch
 import random

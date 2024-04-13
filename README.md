@@ -14,6 +14,7 @@
   - [Install](#install)
   - [Usage](#usage)
   - [Documentation](#documentation)
+  - [Roadmap](#roadmap)
 
 ---
 
@@ -72,3 +73,15 @@ Doing so **will still produce complete charts** for most data sources allowing y
 ## Documentation
 
 Additional documentation can be found in the [Documentation directory](./docs/) included in this repository.
+
+## Roadmap
+
+_As this is a hobby project, no promise is offered for implementation of Roadmap features._
+_However, if you have the time and ability, feel free to submit a Push Request._
+
+* `Feature`: Add ability to use a hash (?) of a latent (image?) to generate a dummy (random?) audio input.
+* `Feature`: Support option for Frame2Frame by using the previous frame as the latent input (img to latent + latent modifier) for the next frame.
+* `Feature`: Add camera effects similar to [Scene Weaver](https://github.com/Sorcerio/Scene-Weaver-Manual) (possible without Img2Img?).
+* `Feature`: Add ability to drag in audio and prompt sequence files to the loader.
+* `Test`: Optimize by using previous image for N number of frames if the delta is small enough. ("Delta Cull Threshold")
+    * Will allow the user to render more frames for areas of high change and less for areas of low change, but retain the same overall FPS/etc.
