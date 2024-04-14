@@ -193,19 +193,9 @@ class AudioFeatureCalculator:
 
         Returns the calculated overall feature modifier.
         """
-        print("---------")
-        print(f"> Step #{self.__shitcount}/{self.__shitmax}")
-        print("Intensity:", str(intensity))
-        print("Tempo:", str(tempo))
-        print("Spectro Mean:", str(spectroMean))
-        print("Spectro Mean Delta:", str(spectroMeanDelta))
-        print("Chroma Mean:", str(chromaMean))
-        print("Harmonic:", str(harmoic))
-        print("Percussive:", str(percussive))
-        print("---------")
-
         # Calculate value for step
-        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
+        # modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta)) # v1.0.0
+        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + (spectroMeanDelta * (harmoic + percussive)))) # v1.1.0
 
         # Return step within bounds
         if (modMax is not None) and (modVal > modMax):
