@@ -40,7 +40,7 @@ class AudioFeatureCalculator:
                 "fps_target": ("FLOAT", {"default": 6, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "feat_mod_max": ("FLOAT", {"default": s.DEF_FEAT_MOD_MAX, "min": -10000.0, "max": 10000.0}), # The maximum value the feature modifier can be. 10,000 should be unattainable through normal usage.
                 "feat_mod_min": ("FLOAT", {"default": s.DEF_FEAT_MOD_MIN, "min": -10000.0, "max": 10000.0}), # The minimum value the feature modifier can be. -10,000 should be unattainable through normal usage.
-                "feat_mod_normalize": ([False, True], ), # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
+                "feat_mod_normalize": ([False, True], ) # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
             }
         }
 
@@ -106,6 +106,9 @@ class AudioFeatureCalculator:
         # Get the mean of the chroma for each step
         chromaMean = np.mean(chroma, axis=0)
 
+        # Calculate the Harmonic and Percussive components
+        harmonics, percussives = librosa.effects.hpss(y)
+
         # Calculate the output FPS
         if fps_target <= 0:
             # Calculate framerate based on audio
@@ -122,6 +125,8 @@ class AudioFeatureCalculator:
         spectroMean = resample(spectroMean, desiredFrames)
         spectroMeanDelta = resample(spectroMeanDelta, desiredFrames)
         chromaMean = resample(chromaMean, desiredFrames)
+        harmonics = resample(harmonics, desiredFrames)
+        percussives = resample(percussives, desiredFrames)
 
         # Calculate the feature modifier for each frame
         featModifiers = torch.Tensor(
@@ -131,6 +136,8 @@ class AudioFeatureCalculator:
                 spectroMean[i],
                 spectroMeanDelta[i],
                 chromaMean[i],
+                harmonics[i],
+                percussives[i],
                 modMax=feat_mod_max,
                 modMin=feat_mod_min
             ) for i in range(desiredFrames)]
@@ -147,6 +154,8 @@ class AudioFeatureCalculator:
             chartData(spectroMean, "Spectrogram Mean"),
             chartData(spectroMeanDelta, "Spectrogram Mean Delta"),
             chartData(chromaMean, "Chroma Mean"),
+            chartData(harmonics, "Harmonic"),
+            chartData(percussives, "Percussive"),
             self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min)
         ])
 
@@ -164,6 +173,8 @@ class AudioFeatureCalculator:
             spectroMean: float,
             spectroMeanDelta: float,
             chromaMean: float,
+            harmoic: float,
+            percussive: float,
             modMax: Optional[float] = None,
             modMin: Optional[float] = None
         ) -> float:
@@ -175,13 +186,28 @@ class AudioFeatureCalculator:
         spectroMean: The normalized mean power for a single step of the audio.
         spectroMeanDelta: The delta of the normalized mean power for a single step of the audio.
         chromaMean: The mean value of the chroma for a single step of the audio.
+        harmoic: The harmonic component of the audio.
+        percussive: The percussive component of the audio.
         modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
         modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
 
         Returns the calculated overall feature modifier.
         """
+        print("---------")
+        print(f"> Step #{self.__shitcount}/{self.__shitmax}")
+        print("Intensity:", str(intensity))
+        print("Tempo:", str(tempo))
+        print("Spectro Mean:", str(spectroMean))
+        print("Spectro Mean Delta:", str(spectroMeanDelta))
+        print("Chroma Mean:", str(chromaMean))
+        print("Harmonic:", str(harmoic))
+        print("Percussive:", str(percussive))
+        print("---------")
+
+        # Calculate value for step
         modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
 
+        # Return step within bounds
         if (modMax is not None) and (modVal > modMax):
             return modMax
         elif (modMin is not None) and (modVal < modMin):
