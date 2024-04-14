@@ -20,6 +20,9 @@ class AudioFeatureCalculator:
     DEF_FEAT_MOD_MAX = 10000.0
     DEF_FEAT_MOD_MIN = -10000.0
 
+    FEAT_MOD_CALC_V1_0_0 = "v1.0.0"
+    FEAT_MOD_CALC_V1_1_0 = "v1.1.0"
+
     RETURN_TYPES = ("TENSOR_1D", "FLOAT", "FLOAT", "IMAGE")
     RETURN_NAMES = ("FEAT_MODS", "FEAT_SECONDS", "FPS", "CHARTS")
     FUNCTION = "process"
@@ -40,7 +43,8 @@ class AudioFeatureCalculator:
                 "fps_target": ("FLOAT", {"default": 6, "min": -1, "max": 10000}), # Provide `<= 0` to use whatever audio sampling comes up with
                 "feat_mod_max": ("FLOAT", {"default": s.DEF_FEAT_MOD_MAX, "min": -10000.0, "max": 10000.0}), # The maximum value the feature modifier can be. 10,000 should be unattainable through normal usage.
                 "feat_mod_min": ("FLOAT", {"default": s.DEF_FEAT_MOD_MIN, "min": -10000.0, "max": 10000.0}), # The minimum value the feature modifier can be. -10,000 should be unattainable through normal usage.
-                "feat_mod_normalize": ([False, True], ) # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
+                "feat_mod_normalize": ([False, True], ), # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
+                "feat_mod_calc": ([s.FEAT_MOD_CALC_V1_1_0, s.FEAT_MOD_CALC_V1_0_0], ) # The calculation to use for the feature modifier.
             }
         }
 
@@ -51,7 +55,8 @@ class AudioFeatureCalculator:
             fps_target: float,
             feat_mod_max: float,
             feat_mod_min: float,
-            feat_mod_normalize: bool
+            feat_mod_normalize: bool,
+            feat_mod_calc: str
         ):
         ## Validation
         # Make sure the feature modifier values are valid
@@ -139,7 +144,8 @@ class AudioFeatureCalculator:
                 harmonics[i],
                 percussives[i],
                 modMax=feat_mod_max,
-                modMin=feat_mod_min
+                modMin=feat_mod_min,
+                calc=feat_mod_calc
             ) for i in range(desiredFrames)]
         )
 
@@ -176,7 +182,8 @@ class AudioFeatureCalculator:
             harmoic: float,
             percussive: float,
             modMax: Optional[float] = None,
-            modMin: Optional[float] = None
+            modMin: Optional[float] = None,
+            calc: str = FEAT_MOD_CALC_V1_1_0
         ) -> float:
         """
         Calculates the overall feature modifier based on the provided audio features.
@@ -190,12 +197,17 @@ class AudioFeatureCalculator:
         percussive: The percussive component of the audio.
         modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
         modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
+        calc: The calculation version to use.
 
         Returns the calculated overall feature modifier.
         """
-        # Calculate value for step
-        # modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta)) # v1.0.0
-        modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + (spectroMeanDelta * (harmoic + percussive)))) # v1.1.0
+        # Calculate the feature modifier
+        if calc == self.FEAT_MOD_CALC_V1_0_0:
+            # v1.0.0
+            modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
+        else:
+            # v1.1.0
+            modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + (spectroMeanDelta * (harmoic + percussive))))
 
         # Return step within bounds
         if (modMax is not None) and (modVal > modMax):
