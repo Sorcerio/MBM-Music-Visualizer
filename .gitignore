@@ -8,3 +8,4 @@ stable-diffusion-comfyui.code-workspace
 promptSequences/
 !promptSequences/example.json
 !promptSequences/PromptSequencesHere.txt
+testfuncs.md

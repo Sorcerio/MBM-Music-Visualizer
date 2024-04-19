@@ -8,6 +8,7 @@ from .mbmPromptSequenceBuilder import PromptSequenceBuilder, PromptSequenceBuild
 from .mbmPromptSequenceInterpolator import PromptSequenceInterpolator
 from .mbmImageConcat import ImageConcatenator
 from .mbmPromptSequenceLoader import PromptSequenceLoader
+from .mbmPromptSequencePreviewer import PromptSequencePreviewer
 
 # A dictionary that contains all nodes you want to export with their names
 # NOTE: names should be globally unique
@@ -20,7 +21,8 @@ NODE_CLASS_MAPPINGS = {
     "mbmPromptSequenceBuilderAdv": PromptSequenceBuilderAdvanced,
     "mbmPromptSequenceInterpolator": PromptSequenceInterpolator,
     "mbmImageConcat": ImageConcatenator,
-    "mbmPromptSequenceLoader": PromptSequenceLoader
+    "mbmPromptSequenceLoader": PromptSequenceLoader,
+    "mbmPromptSequencePreviewer": PromptSequencePreviewer
 }
 
 # A dictionary that contains the friendly/humanly readable titles for the nodes
@@ -33,7 +35,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "mbmPromptSequenceBuilderAdv": "Prompt Sequence Builder (Advanced)",
     "mbmPromptSequenceInterpolator": "Prompt Sequence Interpolator",
     "mbmImageConcat": "Image Concatenator",
-    "mbmPromptSequenceLoader": "Prompt Sequence Loader"
+    "mbmPromptSequenceLoader": "Prompt Sequence Loader",
+    "mbmPromptSequencePreviewer": "Prompt Sequence Previewer"
 }
 
 # Export
