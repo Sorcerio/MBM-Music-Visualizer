@@ -22,6 +22,8 @@ class AudioFeatureCalculator:
 
     FEAT_MOD_CALC_V1_0_0 = "v1.0.0"
     FEAT_MOD_CALC_V1_1_0 = "v1.1.0"
+    FEAT_MOD_CALC_V1_2_0 = "v1.2.0"
+    FEAT_MOD_CALCS = (FEAT_MOD_CALC_V1_2_0, FEAT_MOD_CALC_V1_1_0, FEAT_MOD_CALC_V1_0_0)
 
     RETURN_TYPES = ("TENSOR_1D", "FLOAT", "FLOAT", "IMAGE")
     RETURN_NAMES = ("FEAT_MODS", "FEAT_SECONDS", "FPS", "CHARTS")
@@ -44,7 +46,8 @@ class AudioFeatureCalculator:
                 "feat_mod_max": ("FLOAT", {"default": s.DEF_FEAT_MOD_MAX, "min": -10000.0, "max": 10000.0}), # The maximum value the feature modifier can be. 10,000 should be unattainable through normal usage.
                 "feat_mod_min": ("FLOAT", {"default": s.DEF_FEAT_MOD_MIN, "min": -10000.0, "max": 10000.0}), # The minimum value the feature modifier can be. -10,000 should be unattainable through normal usage.
                 "feat_mod_normalize": ([False, True], ), # If `True`, the feature modifier array will be normalized between 0 and the maximum value in the array.
-                "feat_mod_calc": ([s.FEAT_MOD_CALC_V1_1_0, s.FEAT_MOD_CALC_V1_0_0], ) # The calculation to use for the feature modifier.
+                "feat_mod_calc": (s.FEAT_MOD_CALCS, ), # The calculation to use for the feature modifier.
+                "beat_weight": ("FLOAT", {"default": 1.0}), # The weight to apply to the beat frames.
             }
         }
 
@@ -56,7 +59,8 @@ class AudioFeatureCalculator:
             feat_mod_max: float,
             feat_mod_min: float,
             feat_mod_normalize: bool,
-            feat_mod_calc: str
+            feat_mod_calc: str,
+            beat_weight: float
         ):
         ## Validation
         # Make sure the feature modifier values are valid
@@ -125,6 +129,11 @@ class AudioFeatureCalculator:
         # Calculate desired frame count
         desiredFrames = round(fps * duration)
 
+        # Calculate the beat frames
+        beatTempo, beats = librosa.beat.beat_track(y=y, sr=sr, hop_length=hop_length)
+        beatTimes = librosa.frames_to_time(beats, sr=sr, hop_length=hop_length) # Where each beat is in seconds
+        beatFrames = np.round(beatTimes * fps).astype(int) # Where each beat is in a Video frame
+
         # Resample audio features to match desired frame count
         tempo = resample(tempo, desiredFrames)
         spectroMean = resample(spectroMean, desiredFrames)
@@ -136,6 +145,7 @@ class AudioFeatureCalculator:
         # Calculate the feature modifier for each frame
         featModifiers = torch.Tensor(
             [self._calcFeatModifier(
+                i,
                 intensity,
                 tempo[i],
                 spectroMean[i],
@@ -143,6 +153,8 @@ class AudioFeatureCalculator:
                 chromaMean[i],
                 harmonics[i],
                 percussives[i],
+                beatFrames,
+                beat_weight,
                 modMax=feat_mod_max,
                 modMin=feat_mod_min,
                 calc=feat_mod_calc
@@ -162,6 +174,7 @@ class AudioFeatureCalculator:
             chartData(chromaMean, "Chroma Mean"),
             chartData(harmonics, "Harmonic"),
             chartData(percussives, "Percussive"),
+            self._chartBeatFrames(chromaMean, beatFrames),
             self._chartFeatMod(featModifiers, intensity, feat_mod_normalize, modMax=feat_mod_max, modMin=feat_mod_min)
         ])
 
@@ -174,6 +187,7 @@ class AudioFeatureCalculator:
     
     # Internal Functions
     def _calcFeatModifier(self,
+            frame: int,
             intensity: float,
             tempo: float,
             spectroMean: float,
@@ -181,6 +195,8 @@ class AudioFeatureCalculator:
             chromaMean: float,
             harmoic: float,
             percussive: float,
+            beatFrames: np.ndarray,
+            beatWeight: float,
             modMax: Optional[float] = None,
             modMin: Optional[float] = None,
             calc: str = FEAT_MOD_CALC_V1_1_0
@@ -188,6 +204,7 @@ class AudioFeatureCalculator:
         """
         Calculates the overall feature modifier based on the provided audio features.
 
+        frame: The Video frame number to calculate the feature modifier for.
         intensity: A modifier to increase (>1.0) or decrease (<1.0) the overall effect of the audio features.
         tempo: The tempo for a single step of the audio.
         spectroMean: The normalized mean power for a single step of the audio.
@@ -195,6 +212,8 @@ class AudioFeatureCalculator:
         chromaMean: The mean value of the chroma for a single step of the audio.
         harmoic: The harmonic component of the audio.
         percussive: The percussive component of the audio.
+        beatFrames: A Numpy array of Video frame numbers where each major beat element occurs.
+        beatWeight: The weight to apply to the beat frames.
         modMax: The maximum value the feature modifier can be. Provide `None` to have no maximum.
         modMin: The minimum value the feature modifier can be. Provide `None` to have no minimum.
         calc: The calculation version to use.
@@ -205,9 +224,12 @@ class AudioFeatureCalculator:
         if calc == self.FEAT_MOD_CALC_V1_0_0:
             # v1.0.0
             modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + spectroMeanDelta))
-        else:
+        elif calc == self.FEAT_MOD_CALC_V1_1_0:
             # v1.1.0
             modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + (spectroMeanDelta * (harmoic + percussive))))
+        else:
+            # v1.2.0
+            modVal = (((tempo + 1.0) * (spectroMean + 1.0) * (chromaMean + 1.0)) * (intensity + (spectroMeanDelta * (harmoic + percussive)))) + (beatWeight if frame in beatFrames else 0.0)
 
         # Return step within bounds
         if (modMax is not None) and (modVal > modMax):
@@ -275,6 +297,32 @@ class AudioFeatureCalculator:
         featureInfo += f"Min: {modMinStr}\n"
         featureInfo += f"Intensity: {intensity:.2f}"
         ax.text(1.02, 0.5, featureInfo, transform=ax.transAxes, va="center")
+
+        # Render the chart
+        return renderChart(fig)
+
+    def _chartBeatFrames(self, chroma: np.ndarray, beatFrames: np.ndarray) -> torch.Tensor:
+        """
+        Plots the beat frames over the chroma.
+
+        chroma: The chroma to plot.
+        beatFrames: The beat frames to plot.
+
+        Returns a ComfyUI compatible Tensor image of the chart.
+        """
+        # Prepare figure
+        fig, ax = plt.subplots(figsize=(20, 4))
+
+        # Plot the data
+        ax.plot(chroma)
+        for beat in beatFrames:
+            ax.axvline(x=beat, color="r", linestyle="--")
+
+        # Add labels
+        ax.grid(True)
+        ax.set_xlabel("Frame Number")
+        ax.set_title("Beat Frames")
+        ax.legend()
 
         # Render the chart
         return renderChart(fig)
