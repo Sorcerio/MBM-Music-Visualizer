@@ -1,0 +1,15 @@
+[project]
+name = "mbm-music-visualizer"
+description = "An image generation based music visualizer integrated into comfyanonymous/ComfyUI as custom nodes."
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["librosa~=0.10.1"]
+
+[project.urls]
+Repository = "https://github.com/Sorcerio/MBM-Music-Visualizer"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "MBM-Music-Visualizer"
+Icon = ""
